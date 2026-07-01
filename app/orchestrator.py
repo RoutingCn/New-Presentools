@@ -94,6 +94,7 @@ class Controller:
             f"- 主题：{state.title}",
             f"- 受众：{state.audience}",
             f"- 当前阶段：{state.stage}",
+            f"- 过程事件：{len(self.store.events(project_id))} 条",
             "",
             "## Agent 结论",
         ]
