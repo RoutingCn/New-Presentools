@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>叙构 · Agent 原生演示工作台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><b>叙</b><span><strong>叙构</strong><small>Agent 原生演示工作台</small></span></div>
+    <div class="project-name"><strong id="header-title">未命名项目</strong><small id="save-state">本地事件存储</small></div>
+    <div class="top-actions">
+      <span class="provider"><i></i>本地 Provider</span>
+      <button class="button quiet" id="show-memory" type="button">项目记忆</button>
+      <button class="button primary" id="lock-artifact" type="button" disabled>锁定正式版</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="outline" data-region="outline">
+      <div class="panel-title"><span><small>PRODUCTION</small><strong>内容生产流程</strong></span><em id="stage-count">0 / 5</em></div>
+      <nav class="pipeline" aria-label="生产阶段">
+        <button class="step active" data-stage="contract"><b>01</b><span><strong>任务契约</strong><small>主题、受众与目标</small></span><i></i></button>
+        <button class="step" data-stage="analysis"><b>02</b><span><strong>深度分析</strong><small>假设、反方与缺口</small></span><i></i></button>
+        <button class="step" data-stage="structure"><b>03</b><span><strong>内容结构</strong><small>论点、证据与创意</small></span><i></i></button>
+        <button class="step" data-stage="script"><b>04</b><span><strong>逐字稿</strong><small>叙事、转场与语气</small></span><i></i></button>
+        <button class="step" data-stage="locked"><b>05</b><span><strong>HTML 展示</strong><small>视觉、交互与锁定</small></span><i></i></button>
+      </nav>
+      <section class="outline-body">
+        <div class="subhead"><span>项目大纲</span><button id="collapse-outline" title="折叠大纲">−</button></div>
+        <div id="outline-list"><p class="empty">批准分析提案后，大纲将在这里生成。</p></div>
+      </section>
+      <footer><span>过程记录</span><strong id="event-count">0 条事件</strong></footer>
+    </aside>
+
+    <main class="main" data-region="workspace">
+      <div class="main-head">
+        <span><small id="workspace-kicker">TASK CONTRACT</small><h1 id="workspace-title">建立项目任务契约</h1></span>
+        <span class="stage-meta"><b id="stage-badge">任务契约</b><small id="project-id">尚未创建</small></span>
+      </div>
+
+      <section class="setup" id="project-setup">
+        <form id="project-form">
+          <div class="form-intro"><h2>从主题开始</h2><p>明确问题和受众。总控 Agent 将建立任务契约，并调度四个专业角色。</p></div>
+          <label><span>演示主题</span><input id="topic-input" required value="中国制造业的下一轮增长"></label>
+          <label><span>目标受众</span><input id="audience-input" required value="企业决策者与投资人"></label>
+          <label><span>表达目标</span><textarea id="goal-input" rows="3">形成逻辑成熟、证据可追溯、适合 20 分钟现场演示的判断框架。</textarea></label>
+          <div class="form-actions"><span>首版数据只保存在当前工作区。</span><button class="button primary" type="submit">创建项目</button></div>
+        </form>
+      </section>
+
+      <section class="dashboard hidden" id="project-dashboard">
+        <div class="contract">
+          <div><small>受众</small><strong id="contract-audience"></strong></div>
+          <div><small>模式</small><strong>从主题开始</strong></div>
+          <div><small>成果策略</small><strong>全量版 + 锁定版</strong></div>
+          <button class="button primary" id="analyze-topic" type="button">启动深度分析</button>
+        </div>
+
+        <div class="analysis-progress hidden" id="analysis-status" aria-live="polite">
+          <div><i></i><span><strong>总控 Agent 正在调度</strong><small id="analysis-message">准备四个专业角色的任务契约…</small></span></div>
+          <em><i id="status-progress"></i></em>
+        </div>
+
+        <section class="block">
+          <div class="block-head"><span><small>SPECIALISTS</small><h2>专业 Agent 交付</h2></span><em id="delivery-count">尚未运行</em></div>
+          <div class="agent-list" id="agent-list">
+            <article class="agent pending" data-agent="content"><b>CT</b><span><strong>内容 Agent</strong><p>结构、逻辑、语言与逐字稿。</p></span><em>待命</em></article>
+            <article class="agent pending" data-agent="research"><b class="blue">RS</b><span><strong>资料 Agent</strong><p>证据、口径、反证与引用。</p></span><em>待命</em></article>
+            <article class="agent pending" data-agent="visual"><b class="gray">VS</b><span><strong>视觉 Agent</strong><p>HTML、交互、视觉系统与验证。</p></span><em>待命</em></article>
+            <article class="agent pending" data-agent="creative"><b class="red">CR</b><span><strong>创意 Agent</strong><p>稳健路线与突破路线。</p></span><em>待命</em></article>
+          </div>
+        </section>
+
+        <section class="block hidden" id="proposal-section">
+          <div class="block-head"><span><small>REVIEW GATE</small><h2>总控修改提案</h2></span><em class="waiting">等待批准</em></div>
+          <div class="proposal-head">
+            <span><h3 id="proposal-title"></h3><p id="proposal-rationale"></p></span>
+            <span class="proposal-actions"><button class="button danger" id="reject-proposal">暂不采用</button><button class="button primary" id="accept-proposal">批准并写入全量版</button></span>
+          </div>
+          <div id="changes-table" class="changes"></div>
+        </section>
+
+        <section class="block hidden" id="content-section">
+          <div class="block-head"><span><small>FULL CONTENT</small><h2>全量内容版</h2></span><em id="content-count"></em></div>
+          <div id="content-document" class="document"></div>
+        </section>
+      </section>
+    </main>
+
+    <aside class="utility" data-region="utility">
+      <nav class="tabs" role="tablist" aria-label="协作工具">
+        <button class="active" data-tab="comments">意见</button>
+        <button data-tab="research">资料</button>
+        <button data-tab="memory">记忆</button>
+      </nav>
+      <section class="tool active" data-view="comments">
+        <div class="target"><small>当前目标</small><strong id="selection-ref">项目整体</strong><p id="selection-copy">选择内容对象后，可针对段落、论点、讲稿或视觉提出意见。</p></div>
+        <div class="thread" id="comment-thread"><article><strong>意见会先形成提案</strong><p>总控会说明影响范围，已锁定成果不会被直接改写。</p></article></div>
+        <form class="comment-form" id="comment-form">
+          <label for="comment-input">提出意见</label>
+          <textarea id="comment-input" rows="4" placeholder="例如：补充反方观点，并说明影响范围。"></textarea>
+          <div><small>Ctrl + Enter 发送</small><button class="button primary">加入讨论</button></div>
+        </form>
+      </section>
+      <section class="tool" data-view="research">
+        <div class="search"><label for="research-query">资料搜寻</label><div><input id="research-query" placeholder="关键词、问题或引用"><button class="button primary" id="research-search">搜索</button></div></div>
+        <div class="sources"><label><input type="checkbox" checked>互联网</label><label><input type="checkbox" checked>指定资料目录</label></div>
+        <article class="notice"><strong>检索 Provider 尚未接入</strong><p>当前切片先验证调度、审批与版本保护。入口已经保留，不会生成虚构结果。</p></article>
+        <article class="notice hidden" id="research-result"></article>
+      </section>
+      <section class="tool memory" data-view="memory">
+        <div class="memory-head"><span><small>PROJECT MEMORY</small><strong>memory.md</strong></span><button class="button" id="refresh-memory">刷新</button></div>
+        <pre id="memory-content">创建项目后，过程记忆将在这里生成。</pre>
+      </section>
+      <footer><span>Agent 状态</span><strong id="controller-state">等待任务契约</strong></footer>
+    </aside>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
