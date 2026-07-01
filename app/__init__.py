@@ -1,0 +1,2 @@
+"""Agent-native presentation workspace."""
+
