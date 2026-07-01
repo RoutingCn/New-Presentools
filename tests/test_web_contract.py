@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+import re
 
 
 class WebContractTest(unittest.TestCase):
@@ -28,6 +29,21 @@ class WebContractTest(unittest.TestCase):
         self.assertIn("/accept", script)
         self.assertIn("/artifacts/lock", script)
         self.assertIn("/memory", script)
+
+    def test_topic_form_does_not_ship_with_test_data(self):
+        html = Path("web/index.html").read_text(encoding="utf-8")
+
+        self.assertNotIn('value="中国制造业的下一轮增长"', html)
+        self.assertNotIn('value="企业决策者与投资人"', html)
+        self.assertIn('placeholder="请输入演示主题"', html)
+
+    def test_creating_project_immediately_starts_analysis(self):
+        script = Path("web/app.js").read_text(encoding="utf-8")
+
+        self.assertRegex(
+            script,
+            re.compile(r"renderProject\(\);[\s\S]{0,160}await analyze\(\);"),
+        )
 
 
 if __name__ == "__main__":

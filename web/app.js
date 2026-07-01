@@ -112,7 +112,9 @@ $("#project-form").addEventListener("submit",async event=>{
   event.preventDefault();const button=event.submitter;busy(button,true,"创建中…");
   try{
     state.project=await api.post("/api/projects",{title:$("#topic-input").value,audience:$("#audience-input").value,goal:$("#goal-input").value});
-    renderProject();toast("项目已创建，任务契约已写入事件记录。");
+    renderProject();
+    toast("项目已创建，正在启动深度分析。");
+    await analyze();
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 });
 $("#analyze-topic").addEventListener("click",analyze);$("#accept-proposal").addEventListener("click",accept);$("#lock-artifact").addEventListener("click",lock);
