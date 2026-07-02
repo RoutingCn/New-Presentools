@@ -56,6 +56,7 @@ class Artifact:
     node_ids: tuple[str, ...]
     locked: bool
     created_at: str
+    html: str = ""
 
 
 @dataclass

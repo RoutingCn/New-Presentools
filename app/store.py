@@ -122,8 +122,14 @@ class EventStore:
         accepted = next(item for item in self.project(project_id).proposals if item.id == proposal_id)
         return accepted
 
-    def lock_artifact(self, project_id: str, name: str, node_ids: list[str]) -> Artifact:
-        artifact = Artifact(new_id("art"), name, tuple(node_ids), True, utc_now())
+    def lock_artifact(
+        self,
+        project_id: str,
+        name: str,
+        node_ids: list[str],
+        html: str = "",
+    ) -> Artifact:
+        artifact = Artifact(new_id("art"), name, tuple(node_ids), True, utc_now(), html)
         self.append(
             project_id,
             "artifact.locked",

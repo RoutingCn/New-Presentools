@@ -30,6 +30,8 @@ class WebContractTest(unittest.TestCase):
         self.assertIn("/script", script)
         self.assertIn("/accept", script)
         self.assertIn("/artifacts/lock", script)
+        self.assertIn("artifact.html", script)
+        self.assertIn("window.open", script)
         self.assertIn("/memory", script)
 
     def test_topic_form_does_not_ship_with_test_data(self):

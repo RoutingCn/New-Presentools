@@ -79,6 +79,15 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(state.stage, "script")
         self.assertTrue(any(node.kind == "script" for node in state.content_nodes))
 
+    def test_locked_artifact_contains_rendered_html(self):
+        result = self.controller.analyze_topic(self.project.id)
+        self.controller.accept_proposal(self.project.id, result.proposal.id)
+
+        artifact = self.controller.lock_artifact(self.project.id, "html")
+
+        self.assertIn("<!doctype html>", artifact.html)
+        self.assertIn("<article", artifact.html)
+
 
 if __name__ == "__main__":
     unittest.main()

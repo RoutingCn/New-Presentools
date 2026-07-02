@@ -39,6 +39,8 @@ class ApiApplicationTest(unittest.TestCase):
         self.assertEqual(accepted["status"], "accepted")
         self.assertTrue(locked["locked"])
         self.assertEqual(len(locked["node_ids"]), 5)
+        self.assertIn("<!doctype html>", locked["html"])
+        self.assertIn("<section", locked["html"])
 
     def test_generates_script_proposal_after_structure(self):
         project = self.app.handle(

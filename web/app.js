@@ -106,11 +106,21 @@ async function generateScript(){
   }catch(error){toast(error.message,true)}finally{busy(button,false);updateActionButtons()}
 }
 async function lock(){
-  const button=$("#lock-artifact");busy(button,true,"锁定中…");
+  const button=$("#lock-artifact");busy(button,true,"生成中…");
   try{
     const artifact=await api.post(`/api/projects/${state.project.id}/artifacts/lock`,{name:"正式演示版"});
-    await refresh();setStage("locked");button.textContent="正式版已锁定";button.disabled=true;await memory();toast(`正式版已锁定：${artifact.id}`);
+    openGeneratedHtml(artifact.html,state.project.title);
+    await refresh();setStage("locked");button.textContent="HTML 已生成";button.disabled=true;await memory();toast(`HTML 已生成：${artifact.id}`);
   }catch(error){toast(error.message,true);busy(button,false)}
+}
+function openGeneratedHtml(html,title){
+  const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const opened=window.open(url,`html-${Date.now()}`);
+  if(!opened){
+    const link=document.createElement("a");
+    link.href=url;link.download=`${title||"presentation"}.html`;link.click();
+  }
 }
 async function memory(){
   if(!state.project)return;
