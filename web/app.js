@@ -24,12 +24,27 @@ function safe(value){
   const el=document.createElement("span");el.textContent=value??"";return el.innerHTML;
 }
 function stageNumber(stage){return {contract:0,analysis:1,structure:2,script:3,locked:4}[stage]??0}
+function flowState(){
+  const p=state.project;if(!p)return ["任务契约","填写主题并创建项目","主题、受众和表达目标清楚"];
+  const nodes=p.content_nodes||[],hasContent=nodes.some(n=>n.kind!=="script"),hasScript=nodes.some(n=>n.kind==="script"),pending=state.proposal?.status==="pending";
+  if(p.stage==="locked")return ["HTML 锁定版已生成","查看、下载或回到记忆复盘","锁定版不直接覆盖，全量版仍保留"];
+  if(pending)return ["总控提案待审","批准写入全量版，或退回继续讨论","提案只会在批准后改变全量内容"];
+  if(!hasContent)return ["深度分析未写入","启动分析并审核总控提案","先形成内容结构，再进入逐字稿"];
+  if(!hasScript)return ["内容结构已形成","生成逐字稿提案，或继续提交修订意见","结构稳定后再进入讲稿层"];
+  return ["逐字稿已形成","生成 HTML 锁定版","HTML 只读取内容结构，不混入逐字稿"];
+}
+function renderFlowBridge(){
+  const bridge=$("#flow-bridge");if(!bridge)return;
+  const [current,next,guard]=flowState();
+  $("#bridge-current").textContent=current;$("#bridge-next").textContent=next;$("#bridge-guard").textContent=guard;
+}
 function setStage(stage){
   if(!state.project)return;
   state.project.stage=stage;const current=stageNumber(stage),names=["任务契约","深度分析","内容结构","逐字稿","HTML 展示"];
   $$(".step").forEach((el,i)=>{el.classList.toggle("active",i===current);el.classList.toggle("complete",i<current||stage==="locked")});
   $("#stage-count").textContent=`${current+1} / 5`;$("#stage-badge").textContent=names[current];
   $("#controller-state").textContent=stage==="locked"?"正式版已锁定":`总控：${names[current]}`;
+  renderFlowBridge();
 }
 function renderProject(){
   const p=state.project;if(!p)return;
@@ -38,7 +53,7 @@ function renderProject(){
   $("#workspace-kicker").textContent="ORCHESTRATION";$("#workspace-title").textContent=p.title;
   $("#save-state").textContent="事件已写入本地存储";$("#event-count").textContent=`${p.event_count||1} 条事件`;
   setStage(p.stage||"contract");renderContent();
-  updateActionButtons();
+  updateActionButtons();renderFlowBridge();
 }
 function renderDeliveries(){
   Object.entries(state.analysis.deliveries).forEach(([role,d])=>{
@@ -51,6 +66,7 @@ function renderProposal(){
   const p=state.proposal;$("#proposal-section").classList.remove("hidden");
   $("#proposal-title").textContent=p.title;$("#proposal-rationale").textContent=p.rationale;
   $("#changes-table").innerHTML=p.changes.map((c,i)=>`<div class="change"><small>${safe(c.kind)}</small><strong>${String(i+1).padStart(2,"0")} · ${safe(c.title)}</strong><p>${safe(c.body)}</p></div>`).join("");
+  renderFlowBridge();
 }
 function renderContent(){
   const allNodes=state.project?.content_nodes||[],nodes=allNodes.filter(n=>n.kind!=="script"),scripts=allNodes.filter(n=>n.kind==="script");if(!nodes.length)return;
@@ -113,7 +129,7 @@ async function accept(){
   const button=$("#accept-proposal");busy(button,true,"写入中…");
   try{
     await api.post(`/api/projects/${state.project.id}/proposals/${state.proposal.id}/accept`,{});
-    await refresh();$("#proposal-section").classList.add("hidden");toast("提案已写入全量内容版，原提案仍保留。");
+    state.proposal=null;await refresh();$("#proposal-section").classList.add("hidden");toast("提案已写入全量内容版，原提案仍保留。");
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 }
 async function generateScript(){
@@ -150,6 +166,17 @@ function switchTab(name){
   $$(".tool").forEach(v=>v.classList.toggle("active",v.dataset.view===name));
   if(name==="memory")memory();
 }
+function handleStepNavigation(stage){
+  const target={
+    contract:"#project-dashboard",
+    analysis:"#analysis-status",
+    structure:state.proposal?"#proposal-section":"#content-section",
+    script:"#script-download",
+    locked:"#content-section",
+  }[stage]||"#project-dashboard";
+  const el=$(target);if(el&&!el.classList.contains("hidden"))el.scrollIntoView({behavior:"smooth",block:"start"});
+  if(stage==="locked")switchTab("memory");
+}
 async function rejectProposal(event){
   event?.preventDefault();event?.stopImmediatePropagation();
   if(!state.proposal)return;
@@ -183,22 +210,12 @@ $("#project-form").addEventListener("submit",async event=>{
     await analyze();
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 });
-$("#analyze-topic").addEventListener("click",analyze);$("#generate-script").addEventListener("click",generateScript);$("#accept-proposal").addEventListener("click",accept);$("#lock-artifact").addEventListener("click",lock);
-$("#reject-proposal").addEventListener("click",()=>{$("#proposal-section").classList.add("hidden");toast("提案已暂存，未修改全量内容版。")});
+$("#analyze-topic").addEventListener("click",analyze);$("#generate-script").addEventListener("click",generateScript);$("#accept-proposal").addEventListener("click",accept);$("#reject-proposal").addEventListener("click",rejectProposal);$("#lock-artifact").addEventListener("click",lock);
 $("#show-memory").addEventListener("click",()=>switchTab("memory"));$("#refresh-memory").addEventListener("click",memory);
 $$(".tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+$$(".step").forEach(b=>b.addEventListener("click",()=>handleStepNavigation(b.dataset.stage)));
 $("#collapse-outline").addEventListener("click",e=>{const list=$("#outline-list");list.classList.toggle("hidden");e.currentTarget.textContent=list.classList.contains("hidden")?"+":"−"});
-$("#comment-form").addEventListener("submit",async event=>{
-  event.preventDefault();const input=$("#comment-input"),text=input.value.trim();if(!text)return;
-  const ref=state.selected?$("#selection-ref").textContent:"项目整体";
-  $("#comment-thread").insertAdjacentHTML("beforeend",`<article><strong>${safe(ref)}</strong><p>${safe(text)}</p></article>`);
-  try{
-    state.proposal=await api.post(`/api/projects/${state.project.id}/comments`,{text,target_id:state.selected?.id});
-    renderProposal();input.value="";toast("意见已转为总控修订提案，等待批准写入全量内容版。");
-  }catch(error){toast(error.message,true)}
-});
-$("#reject-proposal").addEventListener("click",rejectProposal,true);
-$("#comment-form").addEventListener("submit",submitComment,true);
+$("#comment-form").addEventListener("submit",submitComment);
 $("#comment-input").addEventListener("keydown",event=>{if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();$("#comment-form").requestSubmit()}});
 $("#research-search").addEventListener("click",()=>{
   const query=$("#research-query").value.trim();if(!query)return toast("请先输入搜索问题。",true);

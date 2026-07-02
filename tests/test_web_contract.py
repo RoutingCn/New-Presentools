@@ -15,6 +15,8 @@ class WebContractTest(unittest.TestCase):
         self.assertIn('id="script-download"', html)
         self.assertIn('id="lock-artifact"', html)
         self.assertIn('id="comment-input"', html)
+        self.assertIn('id="flow-bridge"', html)
+        self.assertIn('id="bridge-current"', html)
 
     def test_styles_use_visible_workspace_dividers(self):
         css = Path("web/styles.css").read_text(encoding="utf-8")
@@ -40,6 +42,9 @@ class WebContractTest(unittest.TestCase):
         self.assertIn("/comments", script)
         self.assertIn("submitComment", script)
         self.assertIn("rejectProposal", script)
+        self.assertIn("flowState", script)
+        self.assertIn("renderFlowBridge", script)
+        self.assertIn("handleStepNavigation", script)
         self.assertIn("/memory", script)
 
     def test_topic_form_does_not_ship_with_test_data(self):

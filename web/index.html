@@ -58,6 +58,11 @@
           <button class="button primary" id="analyze-topic" type="button">启动深度分析</button>
           <button class="button" id="generate-script" type="button" disabled>生成逐字稿</button>
         </div>
+        <section class="flow-bridge" id="flow-bridge" aria-live="polite">
+          <div><small>当前环节</small><strong id="bridge-current">等待任务契约</strong></div>
+          <div><small>下一步</small><strong id="bridge-next">填写主题并创建项目</strong></div>
+          <div><small>通过条件</small><strong id="bridge-guard">主题、受众和表达目标清楚</strong></div>
+        </section>
 
         <div class="analysis-progress hidden" id="analysis-status" aria-live="polite">
           <div><i></i><span><strong>总控 Agent 正在调度</strong><small id="analysis-message">准备四个专业角色的任务契约…</small></span></div>
