@@ -11,7 +11,7 @@
     <div class="brand"><b>叙</b><span><strong>叙构</strong><small>Agent 原生演示工作台</small></span></div>
     <div class="project-name"><strong id="header-title">未命名项目</strong><small id="save-state">本地事件存储</small></div>
     <div class="top-actions">
-      <span class="provider"><i></i>本地 Provider</span>
+      <span class="provider" id="provider-status"><i></i>本地模拟</span>
       <button class="button quiet" id="show-memory" type="button">项目记忆</button>
       <button class="button primary" id="lock-artifact" type="button" disabled>锁定正式版</button>
     </div>
@@ -118,6 +118,7 @@
     </aside>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/provider-status.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

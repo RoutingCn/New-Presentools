@@ -46,5 +46,15 @@ class WebContractTest(unittest.TestCase):
         )
 
 
+    def test_provider_badge_loads_safe_health_status(self):
+        html = Path("web/index.html").read_text(encoding="utf-8")
+        script = Path("web/provider-status.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="provider-status"', html)
+        self.assertIn('/api/health', script)
+        self.assertIn('health.provider==="deepseek"', script)
+        self.assertIn('本地模拟', script)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from app.server import create_app
@@ -60,6 +61,26 @@ class ApiApplicationTest(unittest.TestCase):
                 "/api/projects",
                 {"title": "  ", "audience": "企业决策者"},
             )
+
+
+    def test_health_reports_local_fallback_without_key(self):
+        app = create_app(Path(self.temp.name), environ={})
+
+        self.assertEqual(
+            app.handle("GET", "/api/health"),
+            {"status": "ok", "provider": "deterministic-local"},
+        )
+
+    def test_health_reports_deepseek_without_exposing_key(self):
+        app = create_app(
+            Path(self.temp.name),
+            environ={"DEEPSEEK_API_KEY": "server-secret"},
+        )
+        health = app.handle("GET", "/api/health")
+
+        self.assertEqual(health["provider"], "deepseek")
+        self.assertEqual(health["model"], "deepseek-v4-flash")
+        self.assertNotIn("server-secret", json.dumps(health))
 
 
 if __name__ == "__main__":

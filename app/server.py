@@ -3,22 +3,26 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import re
 from dataclasses import asdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from .agents import DeterministicProvider
+from .deepseek import DeepSeekProvider, HttpTransport
 from .orchestrator import Controller
+from .provider_config import ProviderConfig
 from .store import EventStore
 
 
 class ApiApplication:
-    def __init__(self, controller: Controller):
+    def __init__(self, controller: Controller, provider_info: dict[str, str] | None = None):
         self.controller = controller
+        self.provider_info = provider_info or {"provider": "deterministic-local"}
 
     def handle(
         self,
@@ -28,7 +32,7 @@ class ApiApplication:
     ) -> dict[str, Any]:
         body = body or {}
         if method == "GET" and path == "/api/health":
-            return {"status": "ok", "provider": "deterministic-local"}
+            return {"status": "ok", **self.provider_info}
         if method == "POST" and path == "/api/projects":
             title = str(body.get("title", "")).strip()
             audience = str(body.get("audience", "")).strip()
@@ -74,10 +78,20 @@ class ApiApplication:
         raise KeyError(f"Route not found: {method} {path}")
 
 
-def create_app(data_root: Path) -> ApiApplication:
+def create_app(
+    data_root: Path,
+    environ: Mapping[str, str] | None = None,
+    transport: HttpTransport | None = None,
+) -> ApiApplication:
+    config = ProviderConfig.from_environ(os.environ if environ is None else environ)
     store = EventStore(Path(data_root))
-    controller = Controller(store, DeterministicProvider())
-    return ApiApplication(controller)
+    if config.deepseek_enabled:
+        provider = DeepSeekProvider(config, transport)
+        provider_info = {"provider": "deepseek", "model": config.model}
+    else:
+        provider = DeterministicProvider()
+        provider_info = {"provider": "deterministic-local"}
+    return ApiApplication(Controller(store, provider), provider_info)
 
 
 class WorkspaceRequestHandler(BaseHTTPRequestHandler):

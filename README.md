@@ -28,3 +28,17 @@ Agent 原生 HTML 演示系统的第一条可运行纵向闭环。
 ```powershell
 & 'C:\Users\Lenovo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest discover -s tests -v
 ```
+
+## DeepSeek 配置
+
+未设置 `DEEPSEEK_API_KEY` 时，系统使用本地模拟 Provider，适合测试完整界面、审批和版本流程。
+
+需要测试真实模型时，请先撤销任何曾经公开发送过的密钥，再在当前 PowerShell 会话中输入一个新密钥：
+
+```powershell
+$env:DEEPSEEK_API_KEY = Read-Host "DeepSeek API key"
+$env:DEEPSEEK_MODEL = "deepseek-v4-flash"
+& 'C:\Users\Lenovo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m app.server --port 4173
+```
+
+可选配置见 `.env.example`。应用不会自动读取 `.env`，密钥只从启动进程的环境变量获取。`/api/health` 只返回 Provider 和模型名称，不返回密钥。
