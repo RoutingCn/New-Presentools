@@ -122,6 +122,14 @@ class EventStore:
         accepted = next(item for item in self.project(project_id).proposals if item.id == proposal_id)
         return accepted
 
+    def reject_proposal(self, project_id: str, proposal_id: str) -> Proposal:
+        state = self.project(project_id)
+        proposal = next(item for item in state.proposals if item.id == proposal_id)
+        if proposal.status != "pending":
+            return proposal
+        self.append(project_id, "proposal.rejected", {"proposal_id": proposal_id})
+        return next(item for item in self.project(project_id).proposals if item.id == proposal_id)
+
     def lock_artifact(
         self,
         project_id: str,
@@ -209,6 +217,12 @@ class EventStore:
                     if raw.get("kind") == "script":
                         stage = "script"
                 state.stage = stage
+            elif event.kind == "proposal.rejected":
+                proposal_id = event.payload["proposal_id"]
+                state.proposals = [
+                    replace(item, status="rejected") if item.id == proposal_id else item
+                    for item in state.proposals
+                ]
             elif event.kind == "artifact.locked":
                 raw = event.payload["artifact"]
                 state.artifacts.append(

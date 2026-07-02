@@ -73,6 +73,21 @@ class ArkHtmlProviderTest(unittest.TestCase):
 
         self.assertTrue(html.lower().startswith("<!doctype html>"))
 
+    def test_wraps_fragment_from_model_as_complete_html(self):
+        transport = FakeTransport("<main><h1>Ark Fragment</h1></main>")
+        config = ProviderConfig.from_environ({
+            "ARK_API_KEY": "ark-secret",
+            "ARK_BASE_URL": "https://ark.example.test/api/v3",
+        })
+        state = ProjectState(id="p1", title="Title", audience="Audience")
+        nodes = (ContentNode(id="n1", kind="claim", title="Title", body="Body"),)
+
+        html = ArkHtmlProvider(config, transport).render(state, nodes)
+
+        self.assertTrue(html.lower().startswith("<!doctype html>"))
+        self.assertIn("<html", html.lower())
+        self.assertIn("Ark Fragment", html)
+
 
 if __name__ == "__main__":
     unittest.main()

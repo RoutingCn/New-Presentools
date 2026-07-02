@@ -84,6 +84,9 @@ class Controller:
     def accept_proposal(self, project_id: str, proposal_id: str) -> Proposal:
         return self.store.accept_proposal(project_id, proposal_id)
 
+    def reject_proposal(self, project_id: str, proposal_id: str) -> Proposal:
+        return self.store.reject_proposal(project_id, proposal_id)
+
     def generate_script(self, project_id: str) -> Proposal:
         state = self.store.project(project_id)
         structure_nodes = [

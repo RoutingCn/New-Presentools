@@ -139,6 +139,16 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(proposal.changes[0]["kind"], "revision")
         self.assertIn("反方观点", proposal.changes[0]["body"])
 
+    def test_rejecting_proposal_marks_it_without_writing_nodes(self):
+        result = self.controller.analyze_topic(self.project.id)
+
+        rejected = self.controller.reject_proposal(self.project.id, result.proposal.id)
+        state = self.controller.store.project(self.project.id)
+
+        self.assertEqual(rejected.status, "rejected")
+        self.assertEqual(state.proposals[0].status, "rejected")
+        self.assertEqual(state.content_nodes, [])
+
     def test_script_titles_are_unique_when_source_titles_repeat(self):
         self.controller.store.add_content_node(
             self.project.id,

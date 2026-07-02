@@ -77,10 +77,7 @@ class ArkHtmlProvider:
             },
             self.config.ark_timeout_seconds,
         )
-        html = _parse_html(response)
-        if "<html" not in html.lower():
-            raise ValueError("Ark HTML provider returned incomplete HTML")
-        return html
+        return _parse_html(response)
 
 
 def _build_messages(
@@ -133,7 +130,25 @@ def _normalize_html(content: str) -> str:
     match = re.search(r"<!doctype html>.*", content, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(0).strip()
-    match = re.search(r"<html[\s\S]*?</html>", content, re.IGNORECASE)
+    match = re.search(r"<html[\s\S]*", content, re.IGNORECASE)
     if match:
         return "<!doctype html>\n" + match.group(0).strip()
-    return content
+    return (
+        "<!doctype html>\n"
+        '<html lang="zh-CN">\n'
+        "<head>\n"
+        '<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        "<title>HTML Presentation</title>\n"
+        "<style>\n"
+        "body{margin:0;font-family:Arial,'Microsoft YaHei',sans-serif;background:#f6f7f9;color:#15171a;}\n"
+        "main{max-width:1080px;margin:0 auto;padding:48px 24px;}\n"
+        "section,article{background:white;border:1px solid #d7dce2;border-left:5px solid #15171a;margin:18px 0;padding:24px;}\n"
+        "h1,h2,h3{line-height:1.25;}p,li{font-size:18px;line-height:1.75;}\n"
+        "</style>\n"
+        "</head>\n"
+        "<body><main>\n"
+        f"{content}\n"
+        "</main></body>\n"
+        "</html>\n"
+    )

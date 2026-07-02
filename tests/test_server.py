@@ -85,6 +85,25 @@ class ApiApplicationTest(unittest.TestCase):
         self.assertEqual(proposal["changes"][0]["kind"], "revision")
         self.assertEqual(proposal["affected_ids"], [node_id])
 
+    def test_reject_proposal_endpoint_marks_proposal_rejected(self):
+        project = self.app.handle(
+            "POST",
+            "/api/projects",
+            {"title": "Topic", "audience": "Audience"},
+        )
+        analysis = self.app.handle("POST", f"/api/projects/{project['id']}/analyze", {})
+
+        rejected = self.app.handle(
+            "POST",
+            f"/api/projects/{project['id']}/proposals/{analysis['proposal']['id']}/reject",
+            {},
+        )
+        state = self.app.handle("GET", f"/api/projects/{project['id']}", {})
+
+        self.assertEqual(rejected["status"], "rejected")
+        self.assertEqual(state["proposals"][0]["status"], "rejected")
+        self.assertEqual(state["content_nodes"], [])
+
     def test_project_and_memory_can_be_read(self):
         project = self.app.handle(
             "POST",

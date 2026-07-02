@@ -60,5 +60,23 @@ class EventStoreTest(unittest.TestCase):
         self.assertEqual(state.proposals[0].status, "accepted")
 
 
+    def test_rejecting_proposal_does_not_create_nodes(self):
+        project = self.store.create_project("Topic", "Audience")
+        proposal = self.store.create_proposal(
+            project.id,
+            title="Draft",
+            rationale="Needs review",
+            changes=[{"kind": "claim", "title": "Claim", "body": "Body"}],
+            affected_ids=[],
+        )
+
+        rejected = self.store.reject_proposal(project.id, proposal.id)
+        state = self.store.project(project.id)
+
+        self.assertEqual(rejected.status, "rejected")
+        self.assertEqual(state.proposals[0].status, "rejected")
+        self.assertEqual(state.content_nodes, [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -150,6 +150,29 @@ function switchTab(name){
   $$(".tool").forEach(v=>v.classList.toggle("active",v.dataset.view===name));
   if(name==="memory")memory();
 }
+async function rejectProposal(event){
+  event?.preventDefault();event?.stopImmediatePropagation();
+  if(!state.proposal)return;
+  const button=$("#reject-proposal");busy(button,true,"退回中...");
+  try{
+    await api.post(`/api/projects/${state.project.id}/proposals/${state.proposal.id}/reject`,{});
+    state.proposal=null;$("#proposal-section").classList.add("hidden");await refresh();
+    toast("提案已回退，未写入全量内容版。");
+  }catch(error){toast(error.message,true)}finally{busy(button,false);updateActionButtons()}
+}
+async function submitComment(event){
+  event.preventDefault();event.stopImmediatePropagation();
+  const input=$("#comment-input"),text=input.value.trim();if(!text)return;
+  const ref=state.selected?$("#selection-ref").textContent:"项目整体";
+  const button=event.submitter||$("#comment-form button[type='submit']");
+  busy(button,true,"总控修订中...");
+  $("#comment-thread").insertAdjacentHTML("beforeend",`<article><strong>${safe(ref)}</strong><p>${safe(text)}</p></article>`);
+  try{
+    state.proposal=await api.post(`/api/projects/${state.project.id}/comments`,{text,target_id:state.selected?.id});
+    renderProposal();input.value="";toast("意见已转为总控修订提案，等待批准写入全量内容版。");
+  }catch(error){toast(error.message,true)}
+  finally{busy(button,false);updateActionButtons()}
+}
 
 $("#project-form").addEventListener("submit",async event=>{
   event.preventDefault();const button=event.submitter;busy(button,true,"创建中…");
@@ -174,6 +197,8 @@ $("#comment-form").addEventListener("submit",async event=>{
     renderProposal();input.value="";toast("意见已转为总控修订提案，等待批准写入全量内容版。");
   }catch(error){toast(error.message,true)}
 });
+$("#reject-proposal").addEventListener("click",rejectProposal,true);
+$("#comment-form").addEventListener("submit",submitComment,true);
 $("#comment-input").addEventListener("keydown",event=>{if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();$("#comment-form").requestSubmit()}});
 $("#research-search").addEventListener("click",()=>{
   const query=$("#research-query").value.trim();if(!query)return toast("请先输入搜索问题。",true);

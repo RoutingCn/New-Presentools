@@ -85,6 +85,18 @@ class ApiApplication:
                 "affected_ids": list(proposal.affected_ids),
             }
 
+        match = re.fullmatch(
+            r"/api/projects/([^/]+)/proposals/([^/]+)/reject",
+            path,
+        )
+        if method == "POST" and match:
+            proposal = self.controller.reject_proposal(match.group(1), match.group(2))
+            return {
+                **proposal.__dict__,
+                "changes": list(proposal.changes),
+                "affected_ids": list(proposal.affected_ids),
+            }
+
         match = re.fullmatch(r"/api/projects/([^/]+)/artifacts/lock", path)
         if method == "POST" and match:
             name = str(body.get("name", "正式版")).strip() or "正式版"
