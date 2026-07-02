@@ -84,6 +84,10 @@ def create_app(
     transport: HttpTransport | None = None,
 ) -> ApiApplication:
     config = ProviderConfig.from_environ(os.environ if environ is None else environ)
+    if config.require_deepseek and not config.deepseek_enabled:
+        raise ValueError(
+            "DEEPSEEK_API_KEY is required when REQUIRE_DEEPSEEK is enabled"
+        )
     store = EventStore(Path(data_root))
     if config.deepseek_enabled:
         provider = DeepSeekProvider(config, transport)

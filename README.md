@@ -42,3 +42,13 @@ $env:DEEPSEEK_MODEL = "deepseek-v4-flash"
 ```
 
 可选配置见 `.env.example`。应用不会自动读取 `.env`，密钥只从启动进程的环境变量获取。`/api/health` 只返回 Provider 和模型名称，不返回密钥。
+
+## 本地真实模型启动
+
+先停止当前本地模拟服务，然后运行：
+
+```powershell
+.\scripts\start-deepseek-local.ps1
+```
+
+脚本会在终端中要求输入一个新 DeepSeek API key，并启用 `REQUIRE_DEEPSEEK=1`。没有 key 时服务会拒绝启动，不会回退到本地模拟。

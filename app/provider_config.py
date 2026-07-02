@@ -10,6 +10,7 @@ class ProviderConfig:
     model: str
     base_url: str
     timeout_seconds: float
+    require_deepseek: bool = False
 
     @property
     def deepseek_enabled(self) -> bool:
@@ -38,4 +39,8 @@ class ProviderConfig:
                 or "https://api.deepseek.com"
             ).rstrip("/"),
             timeout_seconds=timeout,
+            require_deepseek=(
+                environ.get("REQUIRE_DEEPSEEK", "").strip().lower()
+                in {"1", "true", "yes", "on"}
+            ),
         )

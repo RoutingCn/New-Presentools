@@ -82,6 +82,10 @@ class ApiApplicationTest(unittest.TestCase):
         self.assertEqual(health["model"], "deepseek-v4-flash")
         self.assertNotIn("server-secret", json.dumps(health))
 
+    def test_required_deepseek_rejects_missing_key(self):
+        with self.assertRaisesRegex(ValueError, "DEEPSEEK_API_KEY"):
+            create_app(Path(self.temp.name), environ={"REQUIRE_DEEPSEEK": "1"})
+
 
 if __name__ == "__main__":
     unittest.main()
