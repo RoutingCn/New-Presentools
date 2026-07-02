@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,11 +57,11 @@ class Controller:
                 "agent.completed",
                 {"delivery": delivery.to_dict()},
             )
-        changes = [
+        changes = self._deduplicate_changes([
             output
             for role in self.ROLES
             for output in deliveries[role].outputs
-        ]
+        ])
         affected_ids = sorted(
             {
                 item
@@ -91,7 +92,9 @@ class Controller:
         ]
         if not structure_nodes:
             raise ValueError("Script generation requires accepted content structure")
-        changes = [_script_change(node) for node in structure_nodes]
+        changes = self._deduplicate_changes([
+            _script_change(node) for node in structure_nodes
+        ])
         return self.store.create_proposal(
             project_id,
             title="生成逐字稿",
@@ -132,7 +135,7 @@ class Controller:
                 "总控已将讨论意见转化为可审阅的修改提案。批准后会写入全量内容版；"
                 "已锁定成果不会被直接改写。"
             ),
-            changes=[
+            changes=self._deduplicate_changes([
                 {
                     "kind": "revision",
                     "title": f"修订建议：{target_title}",
@@ -144,7 +147,7 @@ class Controller:
                     ),
                     "source_ids": affected_ids,
                 }
-            ],
+            ]),
             affected_ids=affected_ids,
         )
 
@@ -214,6 +217,29 @@ class Controller:
         if not delivery.quality_checks or not delivery.next_action:
             raise ValueError(f"{delivery.agent} did not complete its quality contract")
 
+    @staticmethod
+    def _deduplicate_changes(changes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        seen_bodies: set[str] = set()
+        title_counts: dict[tuple[str, str], int] = {}
+        result: list[dict[str, Any]] = []
+        for change in changes:
+            body_key = _normalize_for_duplicate_check(change.get("body", ""))
+            if body_key and body_key in seen_bodies:
+                continue
+            if body_key:
+                seen_bodies.add(body_key)
+
+            item = dict(change)
+            kind = str(item.get("kind", "")).strip()
+            title = str(item.get("title", "")).strip()
+            title_key = (kind, _normalize_for_duplicate_check(title))
+            count = title_counts.get(title_key, 0) + 1
+            title_counts[title_key] = count
+            if count > 1 and title:
+                item["title"] = f"{title}（{count}）"
+            result.append(item)
+        return result
+
 
 def _script_change(node: ContentNode) -> dict[str, Any]:
     return {
@@ -231,3 +257,8 @@ def _script_change(node: ContentNode) -> dict[str, Any]:
         ),
         "source_ids": [node.id],
     }
+
+
+def _normalize_for_duplicate_check(value: Any) -> str:
+    text = str(value or "").lower()
+    return re.sub(r"\s+", "", text)

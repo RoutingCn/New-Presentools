@@ -83,6 +83,7 @@ class DeepSeekProviderTest(unittest.TestCase):
         self.assertIn("例子", system)
         self.assertIn("逻辑自洽", system)
         self.assertIn("语言通顺优美", system)
+        self.assertIn("不得重复", system)
 
     def provider(self, content):
         config = ProviderConfig(

@@ -20,6 +20,7 @@ PROFESSIONAL_OUTPUT_CONTRACT = (
     "必须按顶级标准输出。每个 agent 至少给出 3 个 outputs，覆盖 concept、relationship、example "
     "或与角色高度相关的等价模块。每个 output 的 body 必须是完整段落，说明概念、关系、例子、"
     "边界和表达意图，保证逻辑自洽，语言通顺优美，不能只写口号、短句或空泛建议。"
+    "同一批 outputs 不得重复标题，不得重复或改写同质内容。"
     "输出要能被总控 agent 直接合并为完整的内容结构。"
 )
 

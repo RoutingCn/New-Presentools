@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.agents import DeterministicProvider
+from app.agents import AgentDelivery, DeterministicProvider
 from app.orchestrator import Controller
 from app.store import EventStore
 
@@ -14,6 +14,23 @@ class FakeHtmlProvider:
     def render(self, state, nodes):
         self.calls.append((state, tuple(nodes)))
         return "<!doctype html><html><body><main>ark html</main></body></html>"
+
+
+class DuplicateProvider:
+    def run(self, role, contract, context):
+        return AgentDelivery(
+            agent=role,
+            summary="duplicate test",
+            outputs=(
+                {"kind": "concept", "title": "Same Title", "body": "Same body"},
+                {"kind": "concept", "title": "Same Title", "body": "Different body"},
+                {"kind": "example", "title": "Example", "body": "Same body"},
+            ),
+            affected_ids=(),
+            uncertainties=("none",),
+            quality_checks=("checked",),
+            next_action="next",
+        )
 
 
 class ControllerTest(unittest.TestCase):
@@ -47,6 +64,23 @@ class ControllerTest(unittest.TestCase):
         self.assertIn("relationship", kinds)
         self.assertIn("example", kinds)
         self.assertTrue(all(len(change["body"]) >= 80 for change in changes))
+
+    def test_analysis_removes_duplicate_titles_and_bodies(self):
+        controller = Controller(
+            EventStore(Path(self.temp.name) / "dupes"),
+            DuplicateProvider(),
+        )
+        project = controller.create_project("Topic", "Audience")
+
+        result = controller.analyze_topic(project.id)
+
+        title_keys = [
+            (change["kind"], change["title"].strip().lower())
+            for change in result.proposal.changes
+        ]
+        bodies = [change["body"].strip().lower() for change in result.proposal.changes]
+        self.assertEqual(len(title_keys), len(set(title_keys)))
+        self.assertEqual(len(bodies), len(set(bodies)))
 
     def test_agent_delivery_exposes_quality_and_uncertainty(self):
         result = self.controller.analyze_topic(self.project.id)
@@ -104,6 +138,25 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(proposal.affected_ids, (node.id,))
         self.assertEqual(proposal.changes[0]["kind"], "revision")
         self.assertIn("反方观点", proposal.changes[0]["body"])
+
+    def test_script_titles_are_unique_when_source_titles_repeat(self):
+        self.controller.store.add_content_node(
+            self.project.id,
+            kind="concept",
+            title="重复标题",
+            body="第一段内容",
+        )
+        self.controller.store.add_content_node(
+            self.project.id,
+            kind="relationship",
+            title="重复标题",
+            body="第二段内容",
+        )
+
+        proposal = self.controller.generate_script(self.project.id)
+
+        titles = [change["title"] for change in proposal.changes]
+        self.assertEqual(len(titles), len(set(titles)))
 
     def test_accepting_script_proposal_moves_project_to_script_stage(self):
         result = self.controller.analyze_topic(self.project.id)
