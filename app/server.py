@@ -13,6 +13,7 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from .agents import DeterministicProvider
+from .ark_html import ArkHtmlProvider, LocalHtmlProvider
 from .deepseek import DeepSeekProvider, HttpTransport
 from .orchestrator import Controller
 from .provider_config import ProviderConfig
@@ -97,6 +98,10 @@ def create_app(
         raise ValueError(
             "DEEPSEEK_API_KEY is required when REQUIRE_DEEPSEEK is enabled"
         )
+    if config.require_ark_html and not config.ark_html_enabled:
+        raise ValueError(
+            "ARK_API_KEY is required when REQUIRE_ARK_HTML is enabled"
+        )
     store = EventStore(Path(data_root))
     if config.deepseek_enabled:
         provider = DeepSeekProvider(config, transport)
@@ -104,7 +109,14 @@ def create_app(
     else:
         provider = DeterministicProvider()
         provider_info = {"provider": "deterministic-local"}
-    return ApiApplication(Controller(store, provider), provider_info)
+    if config.ark_html_enabled:
+        html_provider = ArkHtmlProvider(config, transport)
+        provider_info["html_provider"] = "ark"
+        provider_info["html_model"] = config.ark_model
+    else:
+        html_provider = LocalHtmlProvider()
+        provider_info["html_provider"] = "local-template"
+    return ApiApplication(Controller(store, provider, html_provider), provider_info)
 
 
 class WorkspaceRequestHandler(BaseHTTPRequestHandler):

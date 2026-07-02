@@ -7,6 +7,15 @@ from app.orchestrator import Controller
 from app.store import EventStore
 
 
+class FakeHtmlProvider:
+    def __init__(self):
+        self.calls = []
+
+    def render(self, state, nodes):
+        self.calls.append((state, tuple(nodes)))
+        return "<!doctype html><html><body><main>ark html</main></body></html>"
+
+
 class ControllerTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -87,6 +96,23 @@ class ControllerTest(unittest.TestCase):
 
         self.assertIn("<!doctype html>", artifact.html)
         self.assertIn("<article", artifact.html)
+
+    def test_lock_artifact_uses_injected_html_provider(self):
+        html_provider = FakeHtmlProvider()
+        controller = Controller(
+            EventStore(Path(self.temp.name) / "ark"),
+            DeterministicProvider(),
+            html_provider,
+        )
+        project = controller.create_project("HTML 新工具", "创业者")
+        result = controller.analyze_topic(project.id)
+        controller.accept_proposal(project.id, result.proposal.id)
+
+        artifact = controller.lock_artifact(project.id, "html")
+
+        self.assertIn("ark html", artifact.html)
+        self.assertEqual(len(html_provider.calls), 1)
+        self.assertTrue(all(node.kind != "script" for node in html_provider.calls[0][1]))
 
     def test_locked_html_excludes_script_nodes(self):
         result = self.controller.analyze_topic(self.project.id)

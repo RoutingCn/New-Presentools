@@ -88,7 +88,11 @@ class ApiApplicationTest(unittest.TestCase):
 
         self.assertEqual(
             app.handle("GET", "/api/health"),
-            {"status": "ok", "provider": "deterministic-local"},
+            {
+                "status": "ok",
+                "provider": "deterministic-local",
+                "html_provider": "local-template",
+            },
         )
 
     def test_health_reports_deepseek_without_exposing_key(self):
@@ -100,11 +104,27 @@ class ApiApplicationTest(unittest.TestCase):
 
         self.assertEqual(health["provider"], "deepseek")
         self.assertEqual(health["model"], "deepseek-v4-flash")
+        self.assertEqual(health["html_provider"], "local-template")
         self.assertNotIn("server-secret", json.dumps(health))
+
+    def test_health_reports_ark_html_without_exposing_key(self):
+        app = create_app(
+            Path(self.temp.name),
+            environ={"ARK_API_KEY": "ark-secret", "ARK_MODEL": "doubao-seed-1-6"},
+        )
+        health = app.handle("GET", "/api/health")
+
+        self.assertEqual(health["html_provider"], "ark")
+        self.assertEqual(health["html_model"], "doubao-seed-1-6")
+        self.assertNotIn("ark-secret", json.dumps(health))
 
     def test_required_deepseek_rejects_missing_key(self):
         with self.assertRaisesRegex(ValueError, "DEEPSEEK_API_KEY"):
             create_app(Path(self.temp.name), environ={"REQUIRE_DEEPSEEK": "1"})
+
+    def test_required_ark_html_rejects_missing_key(self):
+        with self.assertRaisesRegex(ValueError, "ARK_API_KEY"):
+            create_app(Path(self.temp.name), environ={"REQUIRE_ARK_HTML": "1"})
 
 
 if __name__ == "__main__":

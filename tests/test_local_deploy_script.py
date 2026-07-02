@@ -8,6 +8,8 @@ class LocalDeployScriptTest(unittest.TestCase):
 
         self.assertIn("REQUIRE_DEEPSEEK", script)
         self.assertIn("DEEPSEEK_API_KEY", script)
+        self.assertIn("REQUIRE_ARK_HTML", script)
+        self.assertIn("ARK_API_KEY", script)
         self.assertIn("app.server", script)
 
 
