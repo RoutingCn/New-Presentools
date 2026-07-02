@@ -89,6 +89,22 @@ class ControllerTest(unittest.TestCase):
         self.assertTrue(all("讲述逻辑" in change["body"] for change in proposal.changes))
         self.assertTrue(all("例子" in change["body"] for change in proposal.changes))
 
+    def test_comment_creates_revision_proposal(self):
+        result = self.controller.analyze_topic(self.project.id)
+        self.controller.accept_proposal(self.project.id, result.proposal.id)
+        node = self.controller.store.project(self.project.id).content_nodes[0]
+
+        proposal = self.controller.submit_comment(
+            self.project.id,
+            "这里需要补充反方观点，并让表达更具体。",
+            node.id,
+        )
+
+        self.assertEqual(proposal.status, "pending")
+        self.assertEqual(proposal.affected_ids, (node.id,))
+        self.assertEqual(proposal.changes[0]["kind"], "revision")
+        self.assertIn("反方观点", proposal.changes[0]["body"])
+
     def test_accepting_script_proposal_moves_project_to_script_stage(self):
         result = self.controller.analyze_topic(self.project.id)
         self.controller.accept_proposal(self.project.id, result.proposal.id)

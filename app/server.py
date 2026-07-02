@@ -60,6 +60,19 @@ class ApiApplication:
                 "affected_ids": list(proposal.affected_ids),
             }
 
+        match = re.fullmatch(r"/api/projects/([^/]+)/comments", path)
+        if method == "POST" and match:
+            proposal = self.controller.submit_comment(
+                match.group(1),
+                str(body.get("text", "")),
+                body.get("target_id"),
+            )
+            return {
+                **proposal.__dict__,
+                "changes": list(proposal.changes),
+                "affected_ids": list(proposal.affected_ids),
+            }
+
         match = re.fullmatch(
             r"/api/projects/([^/]+)/proposals/([^/]+)/accept",
             path,

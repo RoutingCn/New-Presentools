@@ -78,7 +78,7 @@ class ArkHtmlProvider:
             self.config.ark_timeout_seconds,
         )
         html = _parse_html(response)
-        if "<html" not in html.lower() or "<!doctype" not in html.lower():
+        if "<html" not in html.lower():
             raise ValueError("Ark HTML provider returned incomplete HTML")
         return html
 
@@ -119,11 +119,21 @@ def _parse_html(response: dict) -> str:
         raise ValueError("Ark HTML provider returned an invalid response envelope") from None
     if not isinstance(content, str) or not content.strip():
         raise ValueError("Ark HTML provider returned empty content")
-    return _strip_fence(content.strip())
+    return _normalize_html(_strip_fence(content.strip()))
 
 
 def _strip_fence(content: str) -> str:
     match = re.fullmatch(r"```(?:html)?\s*(.*?)\s*```", content, re.DOTALL)
     if match:
         return match.group(1).strip()
+    return content
+
+
+def _normalize_html(content: str) -> str:
+    match = re.search(r"<!doctype html>.*", content, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(0).strip()
+    match = re.search(r"<html[\s\S]*?</html>", content, re.IGNORECASE)
+    if match:
+        return "<!doctype html>\n" + match.group(0).strip()
     return content

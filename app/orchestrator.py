@@ -103,6 +103,51 @@ class Controller:
             affected_ids=[node.id for node in structure_nodes],
         )
 
+    def submit_comment(
+        self,
+        project_id: str,
+        text: str,
+        target_id: str | None = None,
+    ) -> Proposal:
+        state = self.store.project(project_id)
+        comment = text.strip()
+        if not comment:
+            raise ValueError("Comment cannot be empty")
+        target = next(
+            (node for node in state.content_nodes if node.id == target_id),
+            None,
+        )
+        affected_ids = [target.id] if target else []
+        target_title = target.title if target else "项目整体"
+        target_body = target.body if target else "这条意见针对项目整体结构、表达或成果策略。"
+        self.store.append(
+            project_id,
+            "comment.added",
+            {"text": comment, "target_id": target.id if target else None},
+        )
+        return self.store.create_proposal(
+            project_id,
+            title=f"根据讨论修订：{target_title}",
+            rationale=(
+                "总控已将讨论意见转化为可审阅的修改提案。批准后会写入全量内容版；"
+                "已锁定成果不会被直接改写。"
+            ),
+            changes=[
+                {
+                    "kind": "revision",
+                    "title": f"修订建议：{target_title}",
+                    "body": (
+                        f"原内容基础：{target_body}\n"
+                        f"讨论意见：{comment}\n"
+                        "修订方向：围绕该意见补充概念、关系、例子或反方观点，"
+                        "让内容更具体、更自洽，并保持语言通顺。"
+                    ),
+                    "source_ids": affected_ids,
+                }
+            ],
+            affected_ids=affected_ids,
+        )
+
     def lock_artifact(self, project_id: str, name: str) -> Artifact:
         state = self.store.project(project_id)
         structure_nodes = tuple(

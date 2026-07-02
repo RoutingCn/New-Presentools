@@ -71,11 +71,14 @@ function renderScriptDownload(scripts){
   $("#download-script").addEventListener("click",()=>downloadScript(scripts));
 }
 function downloadScript(scripts){
-  const text=scripts.map((node,i)=>`# ${i+1}. ${node.title}\n\n${node.body}`).join("\n\n---\n\n");
+  const text=scripts.map((node,i)=>`# ${i+1}. ${cleanScriptTitle(node.title)}\n\n${node.body}`).join("\n\n---\n\n");
   const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
   const url=URL.createObjectURL(blob);
   const link=document.createElement("a");
   link.href=url;link.download=`${state.project?.title||"presentation"}-script.txt`;link.click();
+}
+function cleanScriptTitle(title){
+  return String(title||"").replace(/^逐字稿[：:]\s*/,"");
 }
 function selectNode(id){
   const nodes=state.project.content_nodes,node=nodes.find(n=>n.id===id);if(!node)return;
@@ -162,11 +165,14 @@ $("#reject-proposal").addEventListener("click",()=>{$("#proposal-section").class
 $("#show-memory").addEventListener("click",()=>switchTab("memory"));$("#refresh-memory").addEventListener("click",memory);
 $$(".tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $("#collapse-outline").addEventListener("click",e=>{const list=$("#outline-list");list.classList.toggle("hidden");e.currentTarget.textContent=list.classList.contains("hidden")?"+":"−"});
-$("#comment-form").addEventListener("submit",event=>{
+$("#comment-form").addEventListener("submit",async event=>{
   event.preventDefault();const input=$("#comment-input"),text=input.value.trim();if(!text)return;
   const ref=state.selected?$("#selection-ref").textContent:"项目整体";
   $("#comment-thread").insertAdjacentHTML("beforeend",`<article><strong>${safe(ref)}</strong><p>${safe(text)}</p></article>`);
-  input.value="";toast("意见已加入讨论；下一阶段由总控转为修改提案。");
+  try{
+    state.proposal=await api.post(`/api/projects/${state.project.id}/comments`,{text,target_id:state.selected?.id});
+    renderProposal();input.value="";toast("意见已转为总控修订提案，等待批准写入全量内容版。");
+  }catch(error){toast(error.message,true)}
 });
 $("#comment-input").addEventListener("keydown",event=>{if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();$("#comment-form").requestSubmit()}});
 $("#research-search").addEventListener("click",()=>{

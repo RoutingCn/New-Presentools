@@ -60,6 +60,19 @@ class ArkHtmlProviderTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ARK_API_KEY"):
             ArkHtmlProvider(config)
 
+    def test_accepts_html_without_doctype_from_model(self):
+        transport = FakeTransport("<html><body><main>Ark HTML</main></body></html>")
+        config = ProviderConfig.from_environ({
+            "ARK_API_KEY": "ark-secret",
+            "ARK_BASE_URL": "https://ark.example.test/api/v3",
+        })
+        state = ProjectState(id="p1", title="Title", audience="Audience")
+        nodes = (ContentNode(id="n1", kind="claim", title="Title", body="Body"),)
+
+        html = ArkHtmlProvider(config, transport).render(state, nodes)
+
+        self.assertTrue(html.lower().startswith("<!doctype html>"))
+
 
 if __name__ == "__main__":
     unittest.main()

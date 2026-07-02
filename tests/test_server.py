@@ -60,6 +60,31 @@ class ApiApplicationTest(unittest.TestCase):
         self.assertEqual(script["status"], "pending")
         self.assertTrue(all(change["kind"] == "script" for change in script["changes"]))
 
+    def test_comment_endpoint_returns_revision_proposal(self):
+        project = self.app.handle(
+            "POST",
+            "/api/projects",
+            {"title": "Topic", "audience": "Audience"},
+        )
+        analysis = self.app.handle("POST", f"/api/projects/{project['id']}/analyze", {})
+        self.app.handle(
+            "POST",
+            f"/api/projects/{project['id']}/proposals/{analysis['proposal']['id']}/accept",
+            {},
+        )
+        state = self.app.handle("GET", f"/api/projects/{project['id']}", {})
+        node_id = state["content_nodes"][0]["id"]
+
+        proposal = self.app.handle(
+            "POST",
+            f"/api/projects/{project['id']}/comments",
+            {"text": "请补充反方观点", "target_id": node_id},
+        )
+
+        self.assertEqual(proposal["status"], "pending")
+        self.assertEqual(proposal["changes"][0]["kind"], "revision")
+        self.assertEqual(proposal["affected_ids"], [node_id])
+
     def test_project_and_memory_can_be_read(self):
         project = self.app.handle(
             "POST",
