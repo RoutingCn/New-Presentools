@@ -95,7 +95,37 @@ class DeepSeekProvider:
             },
             self.config.timeout_seconds,
         )
-        return _parse_delivery(role, response)
+        try:
+            return _parse_delivery(role, response)
+        except ValueError as error:
+            response = self.transport(
+                f"{self.config.base_url}/chat/completions",
+                {
+                    "Authorization": f"Bearer {self.config.api_key}",
+                    "Content-Type": "application/json",
+                },
+                {
+                    "model": self.config.model,
+                    "messages": _build_messages(role, contract, context)
+                    + [_repair_message(error)],
+                    "response_format": {"type": "json_object"},
+                    "max_tokens": 3000,
+                },
+                self.config.timeout_seconds,
+            )
+            return _parse_delivery(role, response)
+
+
+def _repair_message(error: ValueError) -> dict[str, str]:
+    return {
+        "role": "user",
+        "content": (
+            "Your previous delivery was rejected: "
+            f"{error}. Return one complete JSON object with agent, summary, "
+            "a non-empty outputs array, affected_ids, uncertainties, "
+            "quality_checks, and next_action. Do not use Markdown."
+        ),
+    }
 
 
 def _build_messages(

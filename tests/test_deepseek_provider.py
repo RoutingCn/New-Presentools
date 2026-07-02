@@ -31,6 +31,16 @@ class FakeTransport:
         return self.response
 
 
+class SequenceTransport:
+    def __init__(self, contents):
+        self.contents = list(contents)
+        self.calls = []
+
+    def __call__(self, url, headers, payload, timeout):
+        self.calls.append((url, headers, payload, timeout))
+        return {"choices": [{"message": {"content": self.contents.pop(0)}}]}
+
+
 class DeepSeekProviderTest(unittest.TestCase):
     def test_returns_valid_agent_delivery(self):
         config = ProviderConfig(
@@ -84,6 +94,20 @@ class DeepSeekProviderTest(unittest.TestCase):
         value["outputs"] = []
         with self.assertRaisesRegex(ValueError, "non-empty outputs"):
             self.provider(json.dumps(value)).run("content", {}, {})
+
+    def test_retries_once_when_delivery_has_empty_outputs(self):
+        invalid = json.loads(valid_content())
+        invalid["outputs"] = []
+        transport = SequenceTransport([json.dumps(invalid), valid_content()])
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+
+        delivery = DeepSeekProvider(config, transport).run("content", {}, {})
+
+        self.assertEqual(delivery.agent, "content")
+        self.assertEqual(len(transport.calls), 2)
+        self.assertIn("non-empty outputs", transport.calls[1][2]["messages"][-1]["content"])
 
     def test_rejects_role_mismatch(self):
         with self.assertRaisesRegex(ValueError, "role mismatch"):
