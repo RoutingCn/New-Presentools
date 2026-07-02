@@ -64,6 +64,26 @@ class DeepSeekProviderTest(unittest.TestCase):
         self.assertIn("制造业增长", payload["messages"][1]["content"])
         self.assertEqual(timeout, 12)
 
+    def test_prompt_requires_professional_structure_and_language(self):
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+        transport = FakeTransport()
+
+        DeepSeekProvider(config, transport).run(
+            "content",
+            {"title": "HTML 演示", "audience": "创业者"},
+            {"events": []},
+        )
+
+        system = transport.calls[0][2]["messages"][0]["content"]
+        self.assertIn("顶级标准", system)
+        self.assertIn("概念", system)
+        self.assertIn("关系", system)
+        self.assertIn("例子", system)
+        self.assertIn("逻辑自洽", system)
+        self.assertIn("语言通顺优美", system)
+
     def provider(self, content):
         config = ProviderConfig(
             "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12

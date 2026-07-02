@@ -36,7 +36,17 @@ class ControllerTest(unittest.TestCase):
             {"content", "research", "visual", "creative"},
         )
         self.assertEqual(result.proposal.status, "pending")
-        self.assertEqual(len(result.proposal.changes), 5)
+        self.assertGreaterEqual(len(result.proposal.changes), 12)
+
+    def test_topic_analysis_contains_professional_content_layers(self):
+        result = self.controller.analyze_topic(self.project.id)
+        changes = result.proposal.changes
+        kinds = {change["kind"] for change in changes}
+
+        self.assertIn("concept", kinds)
+        self.assertIn("relationship", kinds)
+        self.assertIn("example", kinds)
+        self.assertTrue(all(len(change["body"]) >= 80 for change in changes))
 
     def test_agent_delivery_exposes_quality_and_uncertainty(self):
         result = self.controller.analyze_topic(self.project.id)
@@ -76,6 +86,8 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(proposal.status, "pending")
         self.assertTrue(proposal.affected_ids)
         self.assertTrue(all(change["kind"] == "script" for change in proposal.changes))
+        self.assertTrue(all("讲述逻辑" in change["body"] for change in proposal.changes))
+        self.assertTrue(all("例子" in change["body"] for change in proposal.changes))
 
     def test_accepting_script_proposal_moves_project_to_script_stage(self):
         result = self.controller.analyze_topic(self.project.id)

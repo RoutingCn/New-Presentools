@@ -38,7 +38,7 @@ class ApiApplicationTest(unittest.TestCase):
 
         self.assertEqual(accepted["status"], "accepted")
         self.assertTrue(locked["locked"])
-        self.assertEqual(len(locked["node_ids"]), 5)
+        self.assertGreaterEqual(len(locked["node_ids"]), 12)
         self.assertIn("<!doctype html>", locked["html"])
         self.assertIn("<section", locked["html"])
 

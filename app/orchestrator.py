@@ -5,7 +5,7 @@ from typing import Any
 
 from .agents import AgentDelivery, AgentProvider
 from .ark_html import HtmlProvider, LocalHtmlProvider
-from .domain import Artifact, ProjectState, Proposal
+from .domain import Artifact, ContentNode, ProjectState, Proposal
 from .store import EventStore
 
 
@@ -70,8 +70,11 @@ class Controller:
         )
         proposal = self.store.create_proposal(
             project_id,
-            title="采用多 Agent 深度分析",
-            rationale="四个专业角色已完成自检，总控将输出合并为可审阅的初始内容结构。",
+            title="采用多 Agent 顶级标准分析",
+            rationale=(
+                "四个专业角色已按概念、关系、例子和表达质量完成自检，"
+                "总控将输出合并为可审阅、可修改的初始内容结构。"
+            ),
             changes=changes,
             affected_ids=affected_ids,
         )
@@ -88,23 +91,14 @@ class Controller:
         ]
         if not structure_nodes:
             raise ValueError("Script generation requires accepted content structure")
-        changes = [
-            {
-                "kind": "script",
-                "title": f"逐字稿：{node.title}",
-                "body": (
-                    f"这一页先呈现“{node.title}”。\n"
-                    f"讲述要点：{node.body}\n"
-                    "转场：接下来把这个判断与下一层证据或行动连接起来。"
-                ),
-                "source_ids": [node.id],
-            }
-            for node in structure_nodes
-        ]
+        changes = [_script_change(node) for node in structure_nodes]
         return self.store.create_proposal(
             project_id,
             title="生成逐字稿",
-            rationale="将已批准的内容结构转化为可继续修改的讲述稿，保留来源节点以便回溯。",
+            rationale=(
+                "将已批准的内容结构转化为可继续修改的专业讲述稿，"
+                "保留来源节点，方便回溯、下载和再编辑。"
+            ),
             changes=changes,
             affected_ids=[node.id for node in structure_nodes],
         )
@@ -174,3 +168,21 @@ class Controller:
             raise ValueError(f"{delivery.agent} returned an incomplete delivery")
         if not delivery.quality_checks or not delivery.next_action:
             raise ValueError(f"{delivery.agent} did not complete its quality contract")
+
+
+def _script_change(node: ContentNode) -> dict[str, Any]:
+    return {
+        "kind": "script",
+        "title": f"逐字稿：{node.title}",
+        "body": (
+            f"开场意图：这一段先把“{node.title}”讲清楚，让听众知道它在整体论证中的位置，"
+            "而不是把它当成孤立页面。\n"
+            "讲述逻辑：先定义这一节点的核心含义，再说明它和前后内容之间的关系，"
+            f"最后回到听众最关心的判断或行动。具体内容是：{node.body}\n"
+            "例子：可以用一个真实工作场景、业务案例或材料片段帮助听众把抽象判断落到经验里；"
+            "例子必须服务观点，不能抢走主线。\n"
+            "转场：讲完这一点后，要自然连接到下一层证据、反方问题或行动方案，"
+            "让整场表达保持递进。"
+        ),
+        "source_ids": [node.id],
+    }
