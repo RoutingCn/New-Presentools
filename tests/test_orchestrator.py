@@ -58,6 +58,27 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(kinds.count("agent.completed"), 4)
         self.assertIn("proposal.created", kinds)
 
+    def test_generates_script_proposal_from_accepted_structure(self):
+        result = self.controller.analyze_topic(self.project.id)
+        self.controller.accept_proposal(self.project.id, result.proposal.id)
+
+        proposal = self.controller.generate_script(self.project.id)
+
+        self.assertEqual(proposal.status, "pending")
+        self.assertTrue(proposal.affected_ids)
+        self.assertTrue(all(change["kind"] == "script" for change in proposal.changes))
+
+    def test_accepting_script_proposal_moves_project_to_script_stage(self):
+        result = self.controller.analyze_topic(self.project.id)
+        self.controller.accept_proposal(self.project.id, result.proposal.id)
+        proposal = self.controller.generate_script(self.project.id)
+
+        self.controller.accept_proposal(self.project.id, proposal.id)
+        state = self.controller.store.project(self.project.id)
+
+        self.assertEqual(state.stage, "script")
+        self.assertTrue(any(node.kind == "script" for node in state.content_nodes))
+
 
 if __name__ == "__main__":
     unittest.main()

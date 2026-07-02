@@ -11,6 +11,7 @@ class WebContractTest(unittest.TestCase):
         self.assertIn('data-region="workspace"', html)
         self.assertIn('data-region="utility"', html)
         self.assertIn('id="analyze-topic"', html)
+        self.assertIn('id="generate-script"', html)
         self.assertIn('id="lock-artifact"', html)
         self.assertIn('id="comment-input"', html)
 
@@ -26,6 +27,7 @@ class WebContractTest(unittest.TestCase):
 
         self.assertIn("/api/projects", script)
         self.assertIn("/analyze", script)
+        self.assertIn("/script", script)
         self.assertIn("/accept", script)
         self.assertIn("/artifacts/lock", script)
         self.assertIn("/memory", script)

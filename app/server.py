@@ -50,6 +50,15 @@ class ApiApplication:
         if method == "POST" and match:
             return self.controller.analyze_topic(match.group(1)).to_dict()
 
+        match = re.fullmatch(r"/api/projects/([^/]+)/script", path)
+        if method == "POST" and match:
+            proposal = self.controller.generate_script(match.group(1))
+            return {
+                **proposal.__dict__,
+                "changes": list(proposal.changes),
+                "affected_ids": list(proposal.affected_ids),
+            }
+
         match = re.fullmatch(
             r"/api/projects/([^/]+)/proposals/([^/]+)/accept",
             path,

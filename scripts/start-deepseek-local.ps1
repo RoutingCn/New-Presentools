@@ -17,5 +17,8 @@ $env:DEEPSEEK_API_KEY = $apiKey
 $env:DEEPSEEK_MODEL = "deepseek-v4-flash"
 $env:REQUIRE_DEEPSEEK = "1"
 
+Write-Host "Starting real DeepSeek server on http://127.0.0.1:$Port ..."
+Write-Host "Provider fallback is disabled for this process."
+
 & 'C:\Users\Lenovo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' `
     -m app.server --port $Port

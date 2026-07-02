@@ -38,6 +38,7 @@ function renderProject(){
   $("#workspace-kicker").textContent="ORCHESTRATION";$("#workspace-title").textContent=p.title;
   $("#save-state").textContent="事件已写入本地存储";$("#event-count").textContent=`${p.event_count||1} 条事件`;
   setStage(p.stage||"contract");renderContent();
+  updateActionButtons();
 }
 function renderDeliveries(){
   Object.entries(state.analysis.deliveries).forEach(([role,d])=>{
@@ -70,7 +71,14 @@ function selectNode(id){
 async function refresh(){
   state.project=await api.get(`/api/projects/${state.project.id}`);
   state.project.event_count=1+(state.analysis?5:0)+(state.project.proposals?.filter(p=>p.status==="accepted").length||0)+(state.project.artifacts?.length||0);
-  renderProject();$("#lock-artifact").disabled=!state.project.content_nodes.length||state.project.stage==="locked";
+  renderProject();
+}
+function updateActionButtons(){
+  if(!state.project)return;
+  const hasContent=state.project.content_nodes.length>0;
+  const hasScript=state.project.content_nodes.some(node=>node.kind==="script");
+  $("#generate-script").disabled=!hasContent||hasScript||state.project.stage==="locked";
+  $("#lock-artifact").disabled=!hasContent||state.project.stage==="locked";
 }
 async function analyze(){
   const button=$("#analyze-topic");busy(button,true,"分析进行中…");$("#analysis-status").classList.remove("hidden");setStage("analysis");
@@ -87,8 +95,15 @@ async function accept(){
   const button=$("#accept-proposal");busy(button,true,"写入中…");
   try{
     await api.post(`/api/projects/${state.project.id}/proposals/${state.proposal.id}/accept`,{});
-    await refresh();setStage("structure");$("#proposal-section").classList.add("hidden");toast("提案已写入全量内容版，原提案仍保留。");
+    await refresh();$("#proposal-section").classList.add("hidden");toast("提案已写入全量内容版，原提案仍保留。");
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
+}
+async function generateScript(){
+  const button=$("#generate-script");busy(button,true,"生成中…");
+  try{
+    state.proposal=await api.post(`/api/projects/${state.project.id}/script`,{});
+    renderProposal();setStage("script");toast("逐字稿提案已生成，等待批准写入全量版。");
+  }catch(error){toast(error.message,true)}finally{busy(button,false);updateActionButtons()}
 }
 async function lock(){
   const button=$("#lock-artifact");busy(button,true,"锁定中…");
@@ -117,7 +132,7 @@ $("#project-form").addEventListener("submit",async event=>{
     await analyze();
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 });
-$("#analyze-topic").addEventListener("click",analyze);$("#accept-proposal").addEventListener("click",accept);$("#lock-artifact").addEventListener("click",lock);
+$("#analyze-topic").addEventListener("click",analyze);$("#generate-script").addEventListener("click",generateScript);$("#accept-proposal").addEventListener("click",accept);$("#lock-artifact").addEventListener("click",lock);
 $("#reject-proposal").addEventListener("click",()=>{$("#proposal-section").classList.add("hidden");toast("提案已暂存，未修改全量内容版。")});
 $("#show-memory").addEventListener("click",()=>switchTab("memory"));$("#refresh-memory").addEventListener("click",memory);
 $$(".tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));

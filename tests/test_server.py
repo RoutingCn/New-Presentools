@@ -40,6 +40,24 @@ class ApiApplicationTest(unittest.TestCase):
         self.assertTrue(locked["locked"])
         self.assertEqual(len(locked["node_ids"]), 5)
 
+    def test_generates_script_proposal_after_structure(self):
+        project = self.app.handle(
+            "POST",
+            "/api/projects",
+            {"title": "Topic", "audience": "Audience"},
+        )
+        analysis = self.app.handle("POST", f"/api/projects/{project['id']}/analyze", {})
+        self.app.handle(
+            "POST",
+            f"/api/projects/{project['id']}/proposals/{analysis['proposal']['id']}/accept",
+            {},
+        )
+
+        script = self.app.handle("POST", f"/api/projects/{project['id']}/script", {})
+
+        self.assertEqual(script["status"], "pending")
+        self.assertTrue(all(change["kind"] == "script" for change in script["changes"]))
+
     def test_project_and_memory_can_be_read(self):
         project = self.app.handle(
             "POST",

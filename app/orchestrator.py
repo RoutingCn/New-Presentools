@@ -73,6 +73,35 @@ class Controller:
     def accept_proposal(self, project_id: str, proposal_id: str) -> Proposal:
         return self.store.accept_proposal(project_id, proposal_id)
 
+    def generate_script(self, project_id: str) -> Proposal:
+        state = self.store.project(project_id)
+        structure_nodes = [
+            node for node in state.content_nodes
+            if node.kind != "script"
+        ]
+        if not structure_nodes:
+            raise ValueError("Script generation requires accepted content structure")
+        changes = [
+            {
+                "kind": "script",
+                "title": f"逐字稿：{node.title}",
+                "body": (
+                    f"这一页先呈现“{node.title}”。\n"
+                    f"讲述要点：{node.body}\n"
+                    "转场：接下来把这个判断与下一层证据或行动连接起来。"
+                ),
+                "source_ids": [node.id],
+            }
+            for node in structure_nodes
+        ]
+        return self.store.create_proposal(
+            project_id,
+            title="生成逐字稿",
+            rationale="将已批准的内容结构转化为可继续修改的讲述稿，保留来源节点以便回溯。",
+            changes=changes,
+            affected_ids=[node.id for node in structure_nodes],
+        )
+
     def lock_artifact(self, project_id: str, name: str) -> Artifact:
         state = self.store.project(project_id)
         return self.store.lock_artifact(

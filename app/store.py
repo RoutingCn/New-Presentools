@@ -190,6 +190,7 @@ class EventStore:
                     replace(item, status="accepted") if item.id == proposal_id else item
                     for item in state.proposals
                 ]
+                stage = "structure"
                 for raw in event.payload["created_nodes"]:
                     state.content_nodes.append(
                         ContentNode(
@@ -199,7 +200,9 @@ class EventStore:
                             }
                         )
                     )
-                state.stage = "structure"
+                    if raw.get("kind") == "script":
+                        stage = "script"
+                state.stage = stage
             elif event.kind == "artifact.locked":
                 raw = event.payload["artifact"]
                 state.artifacts.append(
