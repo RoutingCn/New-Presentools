@@ -12,6 +12,7 @@ class WebContractTest(unittest.TestCase):
         self.assertIn('data-region="utility"', html)
         self.assertIn('id="analyze-topic"', html)
         self.assertIn('id="generate-script"', html)
+        self.assertIn('id="script-download"', html)
         self.assertIn('id="lock-artifact"', html)
         self.assertIn('id="comment-input"', html)
 
@@ -32,6 +33,8 @@ class WebContractTest(unittest.TestCase):
         self.assertIn("/artifacts/lock", script)
         self.assertIn("artifact.html", script)
         self.assertIn("window.open", script)
+        self.assertIn("downloadScript", script)
+        self.assertIn('kind!=="script"', script)
         self.assertIn("/memory", script)
 
     def test_topic_form_does_not_ship_with_test_data(self):

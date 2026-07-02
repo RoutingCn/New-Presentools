@@ -88,6 +88,18 @@ class ControllerTest(unittest.TestCase):
         self.assertIn("<!doctype html>", artifact.html)
         self.assertIn("<article", artifact.html)
 
+    def test_locked_html_excludes_script_nodes(self):
+        result = self.controller.analyze_topic(self.project.id)
+        self.controller.accept_proposal(self.project.id, result.proposal.id)
+        script = self.controller.generate_script(self.project.id)
+        self.controller.accept_proposal(self.project.id, script.id)
+
+        artifact = self.controller.lock_artifact(self.project.id, "html")
+
+        self.assertNotIn("script</small>", artifact.html)
+        self.assertNotIn("逐字稿：", artifact.html)
+        self.assertNotIn("这一页先呈现", artifact.html)
+
 
 if __name__ == "__main__":
     unittest.main()

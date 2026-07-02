@@ -53,14 +53,29 @@ function renderProposal(){
   $("#changes-table").innerHTML=p.changes.map((c,i)=>`<div class="change"><small>${safe(c.kind)}</small><strong>${String(i+1).padStart(2,"0")} · ${safe(c.title)}</strong><p>${safe(c.body)}</p></div>`).join("");
 }
 function renderContent(){
-  const nodes=state.project?.content_nodes||[];if(!nodes.length)return;
+  const allNodes=state.project?.content_nodes||[],nodes=allNodes.filter(n=>n.kind!=="script"),scripts=allNodes.filter(n=>n.kind==="script");if(!nodes.length)return;
   $("#content-section").classList.remove("hidden");$("#content-count").textContent=`${nodes.length} 个内容对象`;
   $("#outline-list").innerHTML=nodes.map((n,i)=>`<button class="outline-item" data-id="${n.id}"><span>${String(i+1).padStart(2,"0")}</span><strong>${safe(n.title)}</strong></button>`).join("");
   $("#content-document").innerHTML=nodes.map((n,i)=>`<article class="node" data-id="${n.id}" tabindex="0"><small>§${String(i+1).padStart(2,"0")}<br>L${i*4+1}–${i*4+4}</small><span><h3>${safe(n.title)}</h3><p>${safe(n.body)}</p></span></article>`).join("");
+  renderScriptDownload(scripts);
   $$("[data-id]").forEach(el=>{
     el.addEventListener("click",()=>selectNode(el.dataset.id));
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")selectNode(el.dataset.id)});
   });
+}
+function renderScriptDownload(scripts){
+  const box=$("#script-download");if(!box)return;
+  if(!scripts.length){box.classList.add("hidden");box.innerHTML="";return}
+  box.classList.remove("hidden");
+  box.innerHTML='<button class="button" type="button" id="download-script">下载逐字稿</button>';
+  $("#download-script").addEventListener("click",()=>downloadScript(scripts));
+}
+function downloadScript(scripts){
+  const text=scripts.map((node,i)=>`# ${i+1}. ${node.title}\n\n${node.body}`).join("\n\n---\n\n");
+  const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");
+  link.href=url;link.download=`${state.project?.title||"presentation"}-script.txt`;link.click();
 }
 function selectNode(id){
   const nodes=state.project.content_nodes,node=nodes.find(n=>n.id===id);if(!node)return;
@@ -75,7 +90,7 @@ async function refresh(){
 }
 function updateActionButtons(){
   if(!state.project)return;
-  const hasContent=state.project.content_nodes.length>0;
+  const hasContent=state.project.content_nodes.some(node=>node.kind!=="script");
   const hasScript=state.project.content_nodes.some(node=>node.kind==="script");
   $("#generate-script").disabled=!hasContent||hasScript||state.project.stage==="locked";
   $("#lock-artifact").disabled=!hasContent||state.project.stage==="locked";

@@ -105,11 +105,12 @@ class Controller:
 
     def lock_artifact(self, project_id: str, name: str) -> Artifact:
         state = self.store.project(project_id)
+        structure_nodes = [node for node in state.content_nodes if node.kind != "script"]
         html = self._render_html(state)
         return self.store.lock_artifact(
             project_id,
             name,
-            [node.id for node in state.content_nodes],
+            [node.id for node in structure_nodes],
             html,
         )
 
@@ -170,6 +171,7 @@ class Controller:
                 "</article>"
             )
             for node in state.content_nodes
+            if node.kind != "script"
         )
         return (
             "<!doctype html>\n"
