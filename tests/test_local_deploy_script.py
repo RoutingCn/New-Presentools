@@ -10,6 +10,7 @@ class LocalDeployScriptTest(unittest.TestCase):
         self.assertIn("DEEPSEEK_API_KEY", script)
         self.assertIn("REQUIRE_ARK_HTML", script)
         self.assertIn("ARK_API_KEY", script)
+        self.assertIn("Enter a Volcengine Ark model or endpoint id", script)
         self.assertIn("app.server", script)
 
 

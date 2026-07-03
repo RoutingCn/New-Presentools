@@ -64,19 +64,22 @@ class ArkHtmlProvider:
         self.transport = transport or UrllibTransport()
 
     def render(self, state: ProjectState, nodes: tuple[ContentNode, ...]) -> str:
-        response = self.transport(
-            f"{self.config.ark_base_url}/chat/completions",
-            {
-                "Authorization": f"Bearer {self.config.ark_api_key}",
-                "Content-Type": "application/json",
-            },
-            {
-                "model": self.config.ark_model,
-                "messages": _build_messages(state, nodes),
-                "max_tokens": 6000,
-            },
-            self.config.ark_timeout_seconds,
-        )
+        try:
+            response = self.transport(
+                f"{self.config.ark_base_url}/chat/completions",
+                {
+                    "Authorization": f"Bearer {self.config.ark_api_key}",
+                    "Content-Type": "application/json",
+                },
+                {
+                    "model": self.config.ark_model,
+                    "messages": _build_messages(state, nodes),
+                    "max_tokens": 6000,
+                },
+                self.config.ark_timeout_seconds,
+            )
+        except ValueError as error:
+            raise ValueError(_ark_error_message(str(error))) from None
         return _parse_html(response)
 
 
@@ -117,6 +120,15 @@ def _parse_html(response: dict) -> str:
     if not isinstance(content, str) or not content.strip():
         raise ValueError("Ark HTML provider returned empty content")
     return _normalize_html(_strip_fence(content.strip()))
+
+
+def _ark_error_message(message: str) -> str:
+    normalized = message.replace("DeepSeek", "Ark HTML provider")
+    if "status 404" in normalized:
+        normalized += (
+            ". Check the HTML API base URL and model or endpoint id in the HTML API panel."
+        )
+    return normalized
 
 
 def _strip_fence(content: str) -> str:

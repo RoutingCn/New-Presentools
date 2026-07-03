@@ -24,6 +24,11 @@ class FakeTransport:
         return self.response
 
 
+class FailingTransport:
+    def __call__(self, url, headers, payload, timeout):
+        raise ValueError("DeepSeek request failed with status 404")
+
+
 class ArkHtmlProviderTest(unittest.TestCase):
     def test_generates_html_with_ark_chat_completions(self):
         transport = FakeTransport()
@@ -87,6 +92,23 @@ class ArkHtmlProviderTest(unittest.TestCase):
         self.assertTrue(html.lower().startswith("<!doctype html>"))
         self.assertIn("<html", html.lower())
         self.assertIn("Ark Fragment", html)
+
+    def test_relabels_transport_errors_as_ark_html_errors(self):
+        config = ProviderConfig.from_environ({
+            "ARK_API_KEY": "ark-secret",
+            "ARK_BASE_URL": "https://ark.example.test/api/v3",
+            "ARK_MODEL": "bad-model",
+        })
+        state = ProjectState(id="p1", title="Title", audience="Audience")
+        nodes = (ContentNode(id="n1", kind="claim", title="Title", body="Body"),)
+
+        with self.assertRaises(ValueError) as raised:
+            ArkHtmlProvider(config, FailingTransport()).render(state, nodes)
+
+        message = str(raised.exception)
+        self.assertIn("Ark HTML provider request failed with status 404", message)
+        self.assertIn("base URL", message)
+        self.assertNotIn("DeepSeek", message)
 
 
 if __name__ == "__main__":
