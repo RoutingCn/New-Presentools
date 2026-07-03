@@ -93,6 +93,21 @@
           <div class="hidden" id="script-download"></div>
           <div id="content-document" class="document"></div>
         </section>
+
+        <section class="block hidden" id="html-section">
+          <div class="block-head"><span><small>HTML OUTPUT</small><h2>HTML 预览与 API</h2></span><em id="html-provider-summary">未读取</em></div>
+          <form class="html-console" id="html-provider-form">
+            <label><span>Provider</span><select id="html-provider-kind"><option value="ark">火山方舟 / OpenAI-compatible</option><option value="local-template">本地模板</option></select></label>
+            <label><span>Base URL</span><input id="html-base-url" placeholder="https://ark.cn-beijing.volces.com/api/v3"></label>
+            <label><span>Model</span><input id="html-model" placeholder="doubao-seed-1-6"></label>
+            <label><span>API Key</span><input id="html-api-key" type="password" placeholder="只保存在当前服务进程"></label>
+            <div class="html-actions">
+              <button class="button" id="save-html-provider" type="submit">保存 API</button>
+              <button class="button" id="test-html-provider" type="button">测试连接</button>
+              <button class="button primary" id="lock-html-preview" type="button" disabled>锁定当前预览</button>
+            </div>
+          </form>
+        </section>
       </section>
     </main>
 

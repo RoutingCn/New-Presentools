@@ -154,6 +154,74 @@ class Controller:
             affected_ids=affected_ids,
         )
 
+    def revise_node(
+        self,
+        project_id: str,
+        node_id: str,
+        title: str,
+        body: str,
+    ) -> Proposal:
+        state = self.store.project(project_id)
+        node = next(item for item in state.content_nodes if item.id == node_id)
+        new_title = title.strip() or node.title
+        new_body = body.strip()
+        if not new_body:
+            raise ValueError("Revision body cannot be empty")
+        return self.store.create_proposal(
+            project_id,
+            title=f"修改内容对象：{node.title}",
+            rationale="用户发起对象级修改。批准后只更新该对象，并保留提案记录。",
+            changes=[
+                {
+                    "operation": "update",
+                    "node_id": node.id,
+                    "kind": node.kind,
+                    "title": new_title,
+                    "body": new_body,
+                    "source_ids": list(node.source_ids),
+                    "before": {"title": node.title, "body": node.body},
+                }
+            ],
+            affected_ids=[node.id],
+        )
+
+    def delete_node(self, project_id: str, node_id: str, reason: str = "") -> Proposal:
+        state = self.store.project(project_id)
+        node = next(item for item in state.content_nodes if item.id == node_id)
+        return self.store.create_proposal(
+            project_id,
+            title=f"删除内容对象：{node.title}",
+            rationale=reason.strip() or "用户发起对象级删除。批准后该对象会从当前全量内容版移除，历史仍保留。",
+            changes=[
+                {
+                    "operation": "delete",
+                    "node_id": node.id,
+                    "kind": node.kind,
+                    "title": node.title,
+                    "body": node.body,
+                }
+            ],
+            affected_ids=[node.id],
+        )
+
+    def preview_html(self, project_id: str, name: str = "HTML 预览") -> Artifact:
+        state = self.store.project(project_id)
+        structure_nodes = tuple(
+            node for node in state.content_nodes if node.kind != "script"
+        )
+        if not structure_nodes:
+            raise ValueError("HTML preview requires accepted content structure")
+        html = self.html_provider.render(state, structure_nodes)
+        return self.store.preview_artifact(
+            project_id,
+            name,
+            [node.id for node in structure_nodes],
+            html,
+        )
+
+    def lock_html_preview(self, project_id: str, artifact_id: str) -> Artifact:
+        return self.store.lock_preview_artifact(project_id, artifact_id)
+
     def lock_artifact(self, project_id: str, name: str) -> Artifact:
         state = self.store.project(project_id)
         structure_nodes = tuple(

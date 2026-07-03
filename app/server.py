@@ -5,7 +5,7 @@ import json
 import mimetypes
 import os
 import re
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -15,15 +15,24 @@ from urllib.parse import urlparse
 from .agents import DeterministicProvider
 from .ark_html import ArkHtmlProvider, LocalHtmlProvider
 from .deepseek import DeepSeekProvider, HttpTransport
+from .domain import ContentNode, ProjectState
 from .orchestrator import Controller
 from .provider_config import ProviderConfig
 from .store import EventStore
 
 
 class ApiApplication:
-    def __init__(self, controller: Controller, provider_info: dict[str, str] | None = None):
+    def __init__(
+        self,
+        controller: Controller,
+        provider_info: dict[str, str] | None = None,
+        config: ProviderConfig | None = None,
+        transport: HttpTransport | None = None,
+    ):
         self.controller = controller
         self.provider_info = provider_info or {"provider": "deterministic-local"}
+        self.config = config or ProviderConfig.from_environ({})
+        self.transport = transport
 
     def handle(
         self,
@@ -34,6 +43,12 @@ class ApiApplication:
         body = body or {}
         if method == "GET" and path == "/api/health":
             return {"status": "ok", **self.provider_info}
+        if method == "GET" and path == "/api/html-provider":
+            return self._html_provider_summary()
+        if method == "POST" and path == "/api/html-provider":
+            return self._configure_html_provider(body)
+        if method == "POST" and path == "/api/html-provider/test":
+            return self._test_html_provider()
         if method == "POST" and path == "/api/projects":
             title = str(body.get("title", "")).strip()
             audience = str(body.get("audience", "")).strip()
@@ -66,6 +81,33 @@ class ApiApplication:
                 match.group(1),
                 str(body.get("text", "")),
                 body.get("target_id"),
+            )
+            return {
+                **proposal.__dict__,
+                "changes": list(proposal.changes),
+                "affected_ids": list(proposal.affected_ids),
+            }
+
+        match = re.fullmatch(r"/api/projects/([^/]+)/nodes/([^/]+)/revision", path)
+        if method == "POST" and match:
+            proposal = self.controller.revise_node(
+                match.group(1),
+                match.group(2),
+                str(body.get("title", "")),
+                str(body.get("body", "")),
+            )
+            return {
+                **proposal.__dict__,
+                "changes": list(proposal.changes),
+                "affected_ids": list(proposal.affected_ids),
+            }
+
+        match = re.fullmatch(r"/api/projects/([^/]+)/nodes/([^/]+)/delete", path)
+        if method == "POST" and match:
+            proposal = self.controller.delete_node(
+                match.group(1),
+                match.group(2),
+                str(body.get("reason", "")),
             )
             return {
                 **proposal.__dict__,
@@ -106,11 +148,95 @@ class ApiApplication:
                 "node_ids": list(artifact.node_ids),
             }
 
+        match = re.fullmatch(r"/api/projects/([^/]+)/html/preview", path)
+        if method == "POST" and match:
+            artifact = self.controller.preview_html(
+                match.group(1),
+                str(body.get("name", "HTML preview")).strip() or "HTML preview",
+            )
+            return {
+                **asdict(artifact),
+                "node_ids": list(artifact.node_ids),
+            }
+
+        match = re.fullmatch(r"/api/projects/([^/]+)/html/([^/]+)/lock", path)
+        if method == "POST" and match:
+            artifact = self.controller.lock_html_preview(match.group(1), match.group(2))
+            return {
+                **asdict(artifact),
+                "node_ids": list(artifact.node_ids),
+            }
+
         match = re.fullmatch(r"/api/projects/([^/]+)/memory", path)
         if method == "GET" and match:
             return {"markdown": self.controller.memory_markdown(match.group(1))}
 
         raise KeyError(f"Route not found: {method} {path}")
+
+    def _html_provider_summary(self) -> dict[str, Any]:
+        if self.config.ark_html_enabled:
+            return {
+                "provider": "ark",
+                "model": self.config.ark_model,
+                "base_url": self.config.ark_base_url,
+                "key_configured": True,
+                "require_remote": self.config.require_ark_html,
+            }
+        return {
+            "provider": "local-template",
+            "model": "",
+            "base_url": "",
+            "key_configured": False,
+            "require_remote": False,
+        }
+
+    def _configure_html_provider(self, body: dict[str, Any]) -> dict[str, Any]:
+        provider = str(body.get("provider", "local-template")).strip()
+        if provider in {"local", "local-template"}:
+            self.config = replace(
+                self.config,
+                ark_api_key="",
+                require_ark_html=False,
+            )
+            self.controller.html_provider = LocalHtmlProvider()
+            self.provider_info["html_provider"] = "local-template"
+            self.provider_info.pop("html_model", None)
+            return self._html_provider_summary()
+        if provider != "ark":
+            raise ValueError(f"Unsupported HTML provider: {provider}")
+        api_key = str(body.get("api_key", "")).strip() or self.config.ark_api_key
+        if not api_key:
+            raise ValueError("ARK_API_KEY is required for Ark HTML provider")
+        timeout = float(body.get("timeout_seconds", self.config.ark_timeout_seconds))
+        if timeout <= 0:
+            raise ValueError("HTML provider timeout must be positive")
+        self.config = replace(
+            self.config,
+            ark_api_key=api_key,
+            ark_model=str(body.get("model", self.config.ark_model)).strip()
+            or self.config.ark_model,
+            ark_base_url=(
+                str(body.get("base_url", self.config.ark_base_url)).strip()
+                or self.config.ark_base_url
+            ).rstrip("/"),
+            ark_timeout_seconds=timeout,
+            require_ark_html=bool(body.get("require_remote", self.config.require_ark_html)),
+        )
+        self.controller.html_provider = ArkHtmlProvider(self.config, self.transport)
+        self.provider_info["html_provider"] = "ark"
+        self.provider_info["html_model"] = self.config.ark_model
+        return self._html_provider_summary()
+
+    def _test_html_provider(self) -> dict[str, Any]:
+        state = ProjectState(id="provider-test", title="HTML provider test", audience="tester")
+        node = ContentNode(
+            id="node-provider-test",
+            kind="claim",
+            title="Provider test",
+            body="Generate a minimal HTML response for connection testing.",
+        )
+        html = self.controller.html_provider.render(state, (node,))
+        return {"status": "ok", "html_length": len(html), **self._html_provider_summary()}
 
 
 def create_app(
@@ -141,7 +267,12 @@ def create_app(
     else:
         html_provider = LocalHtmlProvider()
         provider_info["html_provider"] = "local-template"
-    return ApiApplication(Controller(store, provider, html_provider), provider_info)
+    return ApiApplication(
+        Controller(store, provider, html_provider),
+        provider_info,
+        config,
+        transport,
+    )
 
 
 class WorkspaceRequestHandler(BaseHTTPRequestHandler):

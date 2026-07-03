@@ -1,4 +1,4 @@
-const state={project:null,analysis:null,proposal:null,selected:null,comments:[]};
+const state={project:null,analysis:null,proposal:null,selected:null,comments:[],htmlPreview:null};
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const api={
   async request(method,path,body){
@@ -71,6 +71,7 @@ function renderProposal(){
 function renderContent(){
   const allNodes=state.project?.content_nodes||[],nodes=allNodes.filter(n=>n.kind!=="script"),scripts=allNodes.filter(n=>n.kind==="script");if(!nodes.length)return;
   $("#content-section").classList.remove("hidden");$("#content-count").textContent=`${nodes.length} 个内容对象`;
+  $("#html-section").classList.remove("hidden");
   $("#outline-list").innerHTML=nodes.map((n,i)=>`<button class="outline-item" data-id="${n.id}"><span>${String(i+1).padStart(2,"0")}</span><strong>${safe(n.title)}</strong></button>`).join("");
   $("#content-document").innerHTML=nodes.map((n,i)=>`<article class="node" data-id="${n.id}" tabindex="0"><small>§${String(i+1).padStart(2,"0")}<br>L${i*4+1}–${i*4+4}</small><span><h3>${safe(n.title)}</h3><p>${safe(n.body)}</p></span></article>`).join("");
   renderScriptDownload(scripts);
@@ -113,6 +114,7 @@ function updateActionButtons(){
   const hasScript=state.project.content_nodes.some(node=>node.kind==="script");
   $("#generate-script").disabled=!hasContent||hasScript||state.project.stage==="locked";
   $("#lock-artifact").disabled=!hasContent||state.project.stage==="locked";
+  $("#lock-html-preview").disabled=!state.htmlPreview||state.project.stage==="locked";
 }
 async function analyze(){
   const button=$("#analyze-topic");busy(button,true,"分析进行中…");$("#analysis-status").classList.remove("hidden");setStage("analysis");
@@ -142,10 +144,48 @@ async function generateScript(){
 async function lock(){
   const button=$("#lock-artifact");busy(button,true,"生成中…");
   try{
-    const artifact=await api.post(`/api/projects/${state.project.id}/artifacts/lock`,{name:"正式演示版"});
-    openGeneratedHtml(artifact.html,state.project.title);
-    await refresh();setStage("locked");button.textContent="HTML 已生成";button.disabled=true;await memory();toast(`HTML 已生成：${artifact.id}`);
+    const artifact=await api.post(`/api/projects/${state.project.id}/html/preview`,{name:"HTML 预览"});
+    state.htmlPreview=artifact;openGeneratedHtml(artifact.html,state.project.title);
+    $("#html-section").classList.remove("hidden");$("#lock-html-preview").disabled=false;setStage("locked");toast(`HTML 预览已生成：${artifact.id}`);
   }catch(error){toast(error.message,true);busy(button,false)}
+  finally{busy(button,false);updateActionButtons()}
+}
+async function lockHtmlPreview(){
+  if(!state.htmlPreview)return;
+  const button=$("#lock-html-preview");busy(button,true,"锁定中…");
+  try{
+    const artifact=await api.post(`/api/projects/${state.project.id}/html/${state.htmlPreview.id}/lock`,{});
+    state.htmlPreview=null;await refresh();setStage("locked");$("#lock-artifact").textContent="HTML 已锁定";await memory();toast(`HTML 已锁定：${artifact.id}`);
+  }catch(error){toast(error.message,true)}finally{busy(button,false);updateActionButtons()}
+}
+function renderHtmlProvider(summary){
+  $("#html-provider-summary").textContent=summary.provider==="ark"?`Ark · ${summary.model}`:"本地模板";
+  $("#html-provider-kind").value=summary.provider==="ark"?"ark":"local-template";
+  $("#html-base-url").value=summary.base_url||"";
+  $("#html-model").value=summary.model||"";
+  $("#html-api-key").value="";
+}
+async function loadHtmlProvider(){
+  try{renderHtmlProvider(await api.get("/api/html-provider"))}
+  catch(error){toast(error.message,true)}
+}
+async function saveHtmlProvider(event){
+  event.preventDefault();const button=$("#save-html-provider");busy(button,true,"保存中…");
+  try{
+    const summary=await api.post("/api/html-provider",{
+      provider:$("#html-provider-kind").value,
+      base_url:$("#html-base-url").value,
+      model:$("#html-model").value,
+      api_key:$("#html-api-key").value,
+      require_remote:$("#html-provider-kind").value==="ark"
+    });
+    renderHtmlProvider(summary);toast("HTML API 已保存，密钥未写入项目记忆。");
+  }catch(error){toast(error.message,true)}finally{busy(button,false)}
+}
+async function testHtmlProvider(){
+  const button=$("#test-html-provider");busy(button,true,"测试中…");
+  try{const result=await api.post("/api/html-provider/test",{});toast(`HTML API 可用：${result.provider}`)}
+  catch(error){toast(error.message,true)}finally{busy(button,false)}
 }
 function openGeneratedHtml(html,title){
   const blob=new Blob([html],{type:"text/html;charset=utf-8"});
@@ -173,6 +213,7 @@ function handleStepNavigation(stage){
     structure:state.proposal?"#proposal-section":"#content-section",
     script:"#script-download",
     locked:"#content-section",
+    html:"#html-section",
   }[stage]||"#project-dashboard";
   const el=$(target);if(el&&!el.classList.contains("hidden"))el.scrollIntoView({behavior:"smooth",block:"start"});
   if(stage==="locked")switchTab("memory");
@@ -211,6 +252,7 @@ $("#project-form").addEventListener("submit",async event=>{
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 });
 $("#analyze-topic").addEventListener("click",analyze);$("#generate-script").addEventListener("click",generateScript);$("#accept-proposal").addEventListener("click",accept);$("#reject-proposal").addEventListener("click",rejectProposal);$("#lock-artifact").addEventListener("click",lock);
+$("#html-provider-form").addEventListener("submit",saveHtmlProvider);$("#test-html-provider").addEventListener("click",testHtmlProvider);$("#lock-html-preview").addEventListener("click",lockHtmlPreview);
 $("#show-memory").addEventListener("click",()=>switchTab("memory"));$("#refresh-memory").addEventListener("click",memory);
 $$(".tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $$(".step").forEach(b=>b.addEventListener("click",()=>handleStepNavigation(b.dataset.stage)));
@@ -221,3 +263,4 @@ $("#research-search").addEventListener("click",()=>{
   const query=$("#research-query").value.trim();if(!query)return toast("请先输入搜索问题。",true);
   const result=$("#research-result");result.classList.remove("hidden");result.innerHTML=`<strong>已记录检索任务</strong><p>“${safe(query)}”将在接入检索 Provider 后同时搜索互联网与指定资料目录。当前不会生成虚构结果。</p>`;
 });
+loadHtmlProvider();

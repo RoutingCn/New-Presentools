@@ -104,20 +104,43 @@ class EventStore:
         if proposal.status != "pending":
             return proposal
         created_nodes = []
+        updated_nodes = []
+        deprecated_ids = []
         for change in proposal.changes:
-            created_nodes.append(
-                {
-                    "id": new_id("node"),
-                    "kind": change["kind"],
-                    "title": change["title"],
-                    "body": change["body"],
-                    "source_ids": change.get("source_ids", []),
-                }
-            )
+            operation = change.get("operation", "create")
+            if operation == "update":
+                node_id = change["node_id"]
+                current = next(node for node in state.content_nodes if node.id == node_id)
+                updated_nodes.append(
+                    {
+                        "id": node_id,
+                        "kind": change.get("kind", current.kind),
+                        "title": change.get("title", current.title),
+                        "body": change.get("body", current.body),
+                        "source_ids": change.get("source_ids", list(current.source_ids)),
+                    }
+                )
+            elif operation == "delete":
+                deprecated_ids.append(change["node_id"])
+            else:
+                created_nodes.append(
+                    {
+                        "id": new_id("node"),
+                        "kind": change["kind"],
+                        "title": change["title"],
+                        "body": change["body"],
+                        "source_ids": change.get("source_ids", []),
+                    }
+                )
         self.append(
             project_id,
             "proposal.accepted",
-            {"proposal_id": proposal_id, "created_nodes": created_nodes},
+            {
+                "proposal_id": proposal_id,
+                "created_nodes": created_nodes,
+                "updated_nodes": updated_nodes,
+                "deprecated_ids": deprecated_ids,
+            },
         )
         accepted = next(item for item in self.project(project_id).proposals if item.id == proposal_id)
         return accepted
@@ -129,6 +152,42 @@ class EventStore:
             return proposal
         self.append(project_id, "proposal.rejected", {"proposal_id": proposal_id})
         return next(item for item in self.project(project_id).proposals if item.id == proposal_id)
+
+    def preview_artifact(
+        self,
+        project_id: str,
+        name: str,
+        node_ids: list[str],
+        html: str,
+    ) -> Artifact:
+        artifact = Artifact(new_id("art"), name, tuple(node_ids), False, utc_now(), html)
+        self.append(
+            project_id,
+            "artifact.previewed",
+            {
+                "artifact": {
+                    **artifact.__dict__,
+                    "node_ids": list(artifact.node_ids),
+                }
+            },
+        )
+        return artifact
+
+    def lock_preview_artifact(self, project_id: str, artifact_id: str) -> Artifact:
+        state = self.project(project_id)
+        preview = next(item for item in state.artifacts if item.id == artifact_id)
+        artifact = replace(preview, locked=True)
+        self.append(
+            project_id,
+            "artifact.locked",
+            {
+                "artifact": {
+                    **artifact.__dict__,
+                    "node_ids": list(artifact.node_ids),
+                }
+            },
+        )
+        return artifact
 
     def lock_artifact(
         self,
@@ -204,8 +263,11 @@ class EventStore:
                     replace(item, status="accepted") if item.id == proposal_id else item
                     for item in state.proposals
                 ]
-                stage = "structure"
-                for raw in event.payload["created_nodes"]:
+                created_nodes = event.payload.get("created_nodes", [])
+                updated_nodes = event.payload.get("updated_nodes", [])
+                deprecated_ids = set(event.payload.get("deprecated_ids", []))
+                stage = state.stage
+                for raw in created_nodes:
                     state.content_nodes.append(
                         ContentNode(
                             **{
@@ -216,6 +278,23 @@ class EventStore:
                     )
                     if raw.get("kind") == "script":
                         stage = "script"
+                    else:
+                        stage = "structure"
+                for raw in updated_nodes:
+                    replacement = ContentNode(
+                        **{
+                            **raw,
+                            "source_ids": tuple(raw.get("source_ids", ())),
+                        }
+                    )
+                    state.content_nodes = [
+                        replacement if node.id == replacement.id else node
+                        for node in state.content_nodes
+                    ]
+                if deprecated_ids:
+                    state.content_nodes = [
+                        node for node in state.content_nodes if node.id not in deprecated_ids
+                    ]
                 state.stage = stage
             elif event.kind == "proposal.rejected":
                 proposal_id = event.payload["proposal_id"]
@@ -223,10 +302,23 @@ class EventStore:
                     replace(item, status="rejected") if item.id == proposal_id else item
                     for item in state.proposals
                 ]
-            elif event.kind == "artifact.locked":
+            elif event.kind == "artifact.previewed":
                 raw = event.payload["artifact"]
                 state.artifacts.append(
                     Artifact(**{**raw, "node_ids": tuple(raw["node_ids"])})
+                )
+            elif event.kind == "artifact.locked":
+                raw = event.payload["artifact"]
+                artifact = Artifact(**{**raw, "node_ids": tuple(raw["node_ids"])})
+                state.artifacts = [
+                    artifact if item.id == artifact.id else item
+                    for item in state.artifacts
+                ]
+                if all(item.id != artifact.id for item in state.artifacts):
+                    state.artifacts.append(artifact)
+                state.artifacts = sorted(
+                    state.artifacts,
+                    key=lambda item: item.created_at,
                 )
                 state.stage = "locked"
         if state is None:
