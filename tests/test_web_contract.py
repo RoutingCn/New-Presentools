@@ -20,6 +20,7 @@ class WebContractTest(unittest.TestCase):
         self.assertIn('id="html-section"', html)
         self.assertIn('id="html-provider-form"', html)
         self.assertIn('id="test-html-provider"', html)
+        self.assertIn('id="download-html"', html)
         self.assertIn('id="lock-html-preview"', html)
 
     def test_styles_use_visible_workspace_dividers(self):
@@ -54,6 +55,8 @@ class WebContractTest(unittest.TestCase):
         self.assertIn("saveHtmlProvider", script)
         self.assertIn("testHtmlProvider", script)
         self.assertIn("lockHtmlPreview", script)
+        self.assertIn("downloadHtml", script)
+        self.assertIn("state.htmlDownload", script)
         self.assertIn("/memory", script)
 
     def test_topic_form_does_not_ship_with_test_data(self):

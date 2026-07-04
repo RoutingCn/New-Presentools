@@ -1,4 +1,4 @@
-const state={project:null,analysis:null,proposal:null,selected:null,comments:[],htmlPreview:null};
+const state={project:null,analysis:null,proposal:null,selected:null,comments:[],htmlPreview:null,htmlDownload:null};
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const api={
   async request(method,path,body){
@@ -115,6 +115,7 @@ function updateActionButtons(){
   $("#generate-script").disabled=!hasContent||hasScript||state.project.stage==="locked";
   $("#lock-artifact").disabled=!hasContent||state.project.stage==="locked";
   $("#lock-html-preview").disabled=!state.htmlPreview||state.project.stage==="locked";
+  $("#download-html").disabled=!state.htmlDownload;
 }
 async function analyze(){
   const button=$("#analyze-topic");busy(button,true,"分析进行中…");$("#analysis-status").classList.remove("hidden");setStage("analysis");
@@ -145,7 +146,7 @@ async function lock(){
   const button=$("#lock-artifact");busy(button,true,"生成中…");
   try{
     const artifact=await api.post(`/api/projects/${state.project.id}/html/preview`,{name:"HTML 预览"});
-    state.htmlPreview=artifact;openGeneratedHtml(artifact.html,state.project.title);
+    state.htmlPreview=artifact;state.htmlDownload=artifact;openGeneratedHtml(artifact.html,state.project.title);
     $("#html-section").classList.remove("hidden");$("#lock-html-preview").disabled=false;setStage("locked");toast(`HTML 预览已生成：${artifact.id}`);
   }catch(error){toast(error.message,true);busy(button,false)}
   finally{busy(button,false);updateActionButtons()}
@@ -155,7 +156,7 @@ async function lockHtmlPreview(){
   const button=$("#lock-html-preview");busy(button,true,"锁定中…");
   try{
     const artifact=await api.post(`/api/projects/${state.project.id}/html/${state.htmlPreview.id}/lock`,{});
-    state.htmlPreview=null;await refresh();setStage("locked");$("#lock-artifact").textContent="HTML 已锁定";await memory();toast(`HTML 已锁定：${artifact.id}`);
+    state.htmlPreview=null;state.htmlDownload=artifact;await refresh();setStage("locked");$("#lock-artifact").textContent="HTML 已锁定";await memory();toast(`HTML 已锁定：${artifact.id}`);
   }catch(error){toast(error.message,true)}finally{busy(button,false);updateActionButtons()}
 }
 function renderHtmlProvider(summary){
@@ -193,6 +194,20 @@ function openGeneratedHtml(html,title){
     const link=document.createElement("a");
     link.href=url;link.download=`${title||"presentation"}.html`;link.click();
   }
+}
+function downloadHtml(){
+  if(!state.htmlDownload?.html)return toast("请先生成 HTML 预览。",true);
+  const title=state.project?.title||state.htmlDownload.name||"presentation";
+  const blob=new Blob([state.htmlDownload.html],{type:"text/html;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");
+  link.href=url;
+  link.download=`${safeFileName(title)}.html`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+function safeFileName(value){
+  return String(value||"presentation").replace(/[\\/:*?"<>|]+/g,"_").trim()||"presentation";
 }
 async function memory(){
   if(!state.project)return;
@@ -250,7 +265,7 @@ $("#project-form").addEventListener("submit",async event=>{
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 });
 $("#analyze-topic").addEventListener("click",analyze);$("#generate-script").addEventListener("click",generateScript);$("#accept-proposal").addEventListener("click",accept);$("#reject-proposal").addEventListener("click",rejectProposal);$("#lock-artifact").addEventListener("click",lock);
-$("#html-provider-form").addEventListener("submit",saveHtmlProvider);$("#test-html-provider").addEventListener("click",testHtmlProvider);$("#lock-html-preview").addEventListener("click",lockHtmlPreview);
+$("#html-provider-form").addEventListener("submit",saveHtmlProvider);$("#test-html-provider").addEventListener("click",testHtmlProvider);$("#download-html").addEventListener("click",downloadHtml);$("#lock-html-preview").addEventListener("click",lockHtmlPreview);
 $("#show-memory").addEventListener("click",()=>switchTab("memory"));$("#refresh-memory").addEventListener("click",memory);
 $$(".tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $$(".step").forEach(b=>b.addEventListener("click",()=>handleStepNavigation(b.dataset.stage)));
