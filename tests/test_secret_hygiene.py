@@ -12,7 +12,7 @@ class SecretHygieneTest(unittest.TestCase):
     def test_example_environment_contains_no_key(self):
         example = Path(".env.example").read_text(encoding="utf-8")
         self.assertIn("DEEPSEEK_API_KEY=", example)
-        self.assertIn("ARK_API_KEY=", example)
+        self.assertNotIn("ARK_API_KEY", example)
         self.assertNotIn("sk-", example)
 
 

@@ -6,28 +6,10 @@ from pathlib import Path
 from app.server import create_app
 
 
-class HtmlTransport:
-    def __init__(self):
-        self.calls = []
-
-    def __call__(self, url, headers, payload, timeout):
-        self.calls.append((url, headers, payload, timeout))
-        return {
-            "choices": [
-                {
-                    "message": {
-                        "content": "<!doctype html><html><body><main>preview html</main></body></html>"
-                    }
-                }
-            ]
-        }
-
-
 class OperationChainTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.transport = HtmlTransport()
-        self.app = create_app(Path(self.temp.name), environ={}, transport=self.transport)
+        self.app = create_app(Path(self.temp.name), environ={})
 
     def tearDown(self):
         self.temp.cleanup()
@@ -82,30 +64,26 @@ class OperationChainTest(unittest.TestCase):
         rejected = self.app.handle("GET", f"/api/projects/{project['id']}", {})
         self.assertTrue(any(item["id"] == node["id"] for item in rejected["content_nodes"]))
 
-    def test_html_provider_can_be_replaced_tested_previewed_and_locked(self):
+    def test_html_provider_can_be_selected_tested_previewed_and_locked(self):
         summary = self.app.handle("GET", "/api/html-provider", {})
-        self.assertEqual(summary["provider"], "local-template")
+        self.assertEqual(summary["provider"], "aesthetic-markdown")
+        self.assertEqual(summary["model"], "swiss")
         self.assertNotIn("api_key", json.dumps(summary))
 
         updated = self.app.handle(
             "POST",
             "/api/html-provider",
             {
-                "provider": "ark",
-                "api_key": "runtime-secret",
-                "model": "doubao-html",
-                "base_url": "https://ark.example.test/api/v3",
-                "timeout_seconds": 12,
-                "require_remote": True,
+                "provider": "aesthetic-markdown",
+                "model": "editorial",
             },
         )
-        self.assertEqual(updated["provider"], "ark")
-        self.assertEqual(updated["model"], "doubao-html")
+        self.assertEqual(updated["provider"], "aesthetic-markdown")
+        self.assertEqual(updated["model"], "editorial")
         self.assertNotIn("runtime-secret", json.dumps(updated))
 
         tested = self.app.handle("POST", "/api/html-provider/test", {})
         self.assertEqual(tested["status"], "ok")
-        self.assertEqual(self.transport.calls[-1][0], "https://ark.example.test/api/v3/chat/completions")
 
         project = self._project_with_content()
         preview = self.app.handle(
@@ -114,7 +92,8 @@ class OperationChainTest(unittest.TestCase):
             {},
         )
         self.assertFalse(preview["locked"])
-        self.assertIn("preview html", preview["html"])
+        self.assertIn('data-paradigm="editorial"', preview["html"])
+        self.assertIn('<nav id="outline"', preview["html"])
 
         locked = self.app.handle(
             "POST",
@@ -123,6 +102,14 @@ class OperationChainTest(unittest.TestCase):
         )
         self.assertTrue(locked["locked"])
         self.assertEqual(locked["html"], preview["html"])
+
+    def test_remote_html_provider_is_not_supported(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported HTML provider"):
+            self.app.handle(
+                "POST",
+                "/api/html-provider",
+                {"provider": "remote-html", "api_key": "runtime-secret"},
+            )
 
 
 if __name__ == "__main__":

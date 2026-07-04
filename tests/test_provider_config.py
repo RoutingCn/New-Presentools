@@ -30,22 +30,6 @@ class ProviderConfigTest(unittest.TestCase):
 
         self.assertTrue(config.require_deepseek)
 
-    def test_reads_trimmed_ark_html_settings(self):
-        config = ProviderConfig.from_environ({
-            "ARK_API_KEY": "  ark-secret  ",
-            "ARK_MODEL": "doubao-seed-1-6",
-            "ARK_BASE_URL": "https://ark.example.test/api/v3/",
-            "ARK_TIMEOUT_SECONDS": "30",
-            "REQUIRE_ARK_HTML": "yes",
-        })
-
-        self.assertTrue(config.ark_html_enabled)
-        self.assertTrue(config.require_ark_html)
-        self.assertEqual(config.ark_api_key, "ark-secret")
-        self.assertEqual(config.ark_model, "doubao-seed-1-6")
-        self.assertEqual(config.ark_base_url, "https://ark.example.test/api/v3")
-        self.assertEqual(config.ark_timeout_seconds, 30.0)
-
     def test_rejects_non_positive_timeout(self):
         with self.assertRaisesRegex(ValueError, "DEEPSEEK_TIMEOUT_SECONDS"):
             ProviderConfig.from_environ({"DEEPSEEK_TIMEOUT_SECONDS": "0"})

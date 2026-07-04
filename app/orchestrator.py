@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from .agents import AgentDelivery, AgentProvider
-from .ark_html import HtmlProvider, LocalHtmlProvider
+from .aesthetic_html import AestheticHtmlProvider
 from .domain import Artifact, ContentNode, ProjectState, Proposal
+from .html_provider import HtmlProvider
 from .store import EventStore
 
 
@@ -40,7 +41,7 @@ class Controller:
     ):
         self.store = store
         self.provider = provider
-        self.html_provider = html_provider or LocalHtmlProvider()
+        self.html_provider = html_provider or AestheticHtmlProvider()
 
     def create_project(self, title: str, audience: str) -> ProjectState:
         return self.store.create_project(title, audience)

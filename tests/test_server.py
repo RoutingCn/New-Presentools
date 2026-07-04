@@ -135,7 +135,8 @@ class ApiApplicationTest(unittest.TestCase):
             {
                 "status": "ok",
                 "provider": "deterministic-local",
-                "html_provider": "local-template",
+                "html_provider": "aesthetic-markdown",
+                "html_model": "swiss",
             },
         )
 
@@ -148,28 +149,24 @@ class ApiApplicationTest(unittest.TestCase):
 
         self.assertEqual(health["provider"], "deepseek")
         self.assertEqual(health["model"], "deepseek-v4-flash")
-        self.assertEqual(health["html_provider"], "local-template")
+        self.assertEqual(health["html_provider"], "aesthetic-markdown")
+        self.assertEqual(health["html_model"], "swiss")
         self.assertNotIn("server-secret", json.dumps(health))
 
-    def test_health_reports_ark_html_without_exposing_key(self):
+    def test_remote_html_environment_is_ignored_for_html_generation(self):
         app = create_app(
             Path(self.temp.name),
-            environ={"ARK_API_KEY": "ark-secret", "ARK_MODEL": "doubao-seed-1-6"},
+            environ={"REMOTE_HTML_API_KEY": "remote-secret"},
         )
         health = app.handle("GET", "/api/health")
 
-        self.assertEqual(health["html_provider"], "ark")
-        self.assertEqual(health["html_model"], "doubao-seed-1-6")
-        self.assertNotIn("ark-secret", json.dumps(health))
+        self.assertEqual(health["html_provider"], "aesthetic-markdown")
+        self.assertEqual(health["html_model"], "swiss")
+        self.assertNotIn("remote-secret", json.dumps(health))
 
     def test_required_deepseek_rejects_missing_key(self):
         with self.assertRaisesRegex(ValueError, "DEEPSEEK_API_KEY"):
             create_app(Path(self.temp.name), environ={"REQUIRE_DEEPSEEK": "1"})
-
-    def test_required_ark_html_rejects_missing_key(self):
-        with self.assertRaisesRegex(ValueError, "ARK_API_KEY"):
-            create_app(Path(self.temp.name), environ={"REQUIRE_ARK_HTML": "1"})
-
 
 if __name__ == "__main__":
     unittest.main()

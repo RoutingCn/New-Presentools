@@ -13,9 +13,10 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from .agents import DeterministicProvider
-from .ark_html import ArkHtmlProvider, LocalHtmlProvider
+from .aesthetic_html import AestheticHtmlProvider
 from .deepseek import DeepSeekProvider, HttpTransport
 from .domain import ContentNode, ProjectState
+from .html_provider import LocalHtmlProvider
 from .orchestrator import Controller
 from .provider_config import ProviderConfig
 from .store import EventStore
@@ -174,13 +175,13 @@ class ApiApplication:
         raise KeyError(f"Route not found: {method} {path}")
 
     def _html_provider_summary(self) -> dict[str, Any]:
-        if self.config.ark_html_enabled:
+        if self.provider_info.get("html_provider") == "aesthetic-markdown":
             return {
-                "provider": "ark",
-                "model": self.config.ark_model,
-                "base_url": self.config.ark_base_url,
-                "key_configured": True,
-                "require_remote": self.config.require_ark_html,
+                "provider": "aesthetic-markdown",
+                "model": self.provider_info.get("html_model", "swiss"),
+                "base_url": "",
+                "key_configured": False,
+                "require_remote": False,
             }
         return {
             "provider": "local-template",
@@ -192,40 +193,21 @@ class ApiApplication:
 
     def _configure_html_provider(self, body: dict[str, Any]) -> dict[str, Any]:
         provider = str(body.get("provider", "local-template")).strip()
+        if provider in {"aesthetic", "aesthetic-markdown"}:
+            paradigm = str(body.get("model", "swiss")).strip() or "swiss"
+            self.controller.html_provider = AestheticHtmlProvider(paradigm)
+            self.provider_info["html_provider"] = "aesthetic-markdown"
+            self.provider_info["html_model"] = paradigm
+            return self._html_provider_summary()
         if provider in {"local", "local-template"}:
             self.config = replace(
                 self.config,
-                ark_api_key="",
-                require_ark_html=False,
             )
             self.controller.html_provider = LocalHtmlProvider()
             self.provider_info["html_provider"] = "local-template"
             self.provider_info.pop("html_model", None)
             return self._html_provider_summary()
-        if provider != "ark":
-            raise ValueError(f"Unsupported HTML provider: {provider}")
-        api_key = str(body.get("api_key", "")).strip() or self.config.ark_api_key
-        if not api_key:
-            raise ValueError("ARK_API_KEY is required for Ark HTML provider")
-        timeout = float(body.get("timeout_seconds", self.config.ark_timeout_seconds))
-        if timeout <= 0:
-            raise ValueError("HTML provider timeout must be positive")
-        self.config = replace(
-            self.config,
-            ark_api_key=api_key,
-            ark_model=str(body.get("model", self.config.ark_model)).strip()
-            or self.config.ark_model,
-            ark_base_url=(
-                str(body.get("base_url", self.config.ark_base_url)).strip()
-                or self.config.ark_base_url
-            ).rstrip("/"),
-            ark_timeout_seconds=timeout,
-            require_ark_html=bool(body.get("require_remote", self.config.require_ark_html)),
-        )
-        self.controller.html_provider = ArkHtmlProvider(self.config, self.transport)
-        self.provider_info["html_provider"] = "ark"
-        self.provider_info["html_model"] = self.config.ark_model
-        return self._html_provider_summary()
+        raise ValueError(f"Unsupported HTML provider: {provider}")
 
     def _test_html_provider(self) -> dict[str, Any]:
         state = ProjectState(id="provider-test", title="HTML provider test", audience="tester")
@@ -249,10 +231,6 @@ def create_app(
         raise ValueError(
             "DEEPSEEK_API_KEY is required when REQUIRE_DEEPSEEK is enabled"
         )
-    if config.require_ark_html and not config.ark_html_enabled:
-        raise ValueError(
-            "ARK_API_KEY is required when REQUIRE_ARK_HTML is enabled"
-        )
     store = EventStore(Path(data_root))
     if config.deepseek_enabled:
         provider = DeepSeekProvider(config, transport)
@@ -260,13 +238,9 @@ def create_app(
     else:
         provider = DeterministicProvider()
         provider_info = {"provider": "deterministic-local"}
-    if config.ark_html_enabled:
-        html_provider = ArkHtmlProvider(config, transport)
-        provider_info["html_provider"] = "ark"
-        provider_info["html_model"] = config.ark_model
-    else:
-        html_provider = LocalHtmlProvider()
-        provider_info["html_provider"] = "local-template"
+    html_provider = AestheticHtmlProvider()
+    provider_info["html_provider"] = "aesthetic-markdown"
+    provider_info["html_model"] = "swiss"
     return ApiApplication(
         Controller(store, provider, html_provider),
         provider_info,

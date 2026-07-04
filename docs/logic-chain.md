@@ -652,60 +652,57 @@ Tab：
 
 - 用户进入 HTML 工作台。
 - 或系统检测到 html_provider 不可用。
-- 或用户明确要求替换 HTML 生成 API。
+- 或用户明确要求切换 HTML 美学范式。
 
 界面：
 
-- HTML 工作台显示“HTML 生成 API 配置”区域。
-- 显示当前 API：
-  - provider：Ark / OpenAI-compatible / Local template
-  - base_url
-  - model
-  - key 状态：已配置/未配置，不显示 key
-  - 是否强制使用远程 API
+- HTML 工作台显示“HTML 生成引擎”区域。
+- 显示当前引擎：
+  - provider：Aesthetic Markdown / Local template
+  - paradigm：Swiss Modern / Editorial Classic / Dark Tech / Neo Brutalist
+  - 是否本地生成
 - 操作按钮：
-  - 更换 API
-  - 测试连接
+  - 更换范式
+  - 测试输出
   - 保存配置
   - 重新生成 HTML
 
 系统动作：
 
-1. 用户选择 API 类型。
-2. 用户输入 base_url、model、api_key。
-3. 前端只把 key 发送到后端安全配置接口，不能写入项目事件或 memory.md。
-4. 后端保存到运行时密钥存储或本地未跟踪配置。
-5. 调用 `/api/health` 或专用 `/api/html-provider/test`。
-6. 成功后更新 provider_info。
-7. HTML 生成调用新的 provider。
+1. 用户选择生成引擎和美学范式。
+2. 前端把 provider 和 paradigm 发送到后端。
+3. 后端切换本地 HTML provider。
+4. 调用 `/api/html-provider/test` 生成测试 HTML。
+5. 成功后更新 provider_info。
+6. HTML 生成调用新的 provider。
 
 建议 API：
 
 | 端点 | 用途 |
 |---|---|
-| GET /api/html-provider | 读取当前 HTML API 配置摘要 |
-| POST /api/html-provider | 更新 provider、base_url、model、key |
-| POST /api/html-provider/test | 测试连接 |
+| GET /api/html-provider | 读取当前 HTML 生成引擎摘要 |
+| POST /api/html-provider | 更新 provider、paradigm |
+| POST /api/html-provider/test | 测试输出 |
 | POST /api/projects/{id}/html/preview | 生成 HTML 预览 |
 | POST /api/projects/{id}/html/{preview_id}/lock | 锁定预览 |
 
 安全规则：
 
-- API key 不能进入浏览器响应。
-- API key 不能进入事件。
-- API key 不能进入 memory.md。
-- API key 不能提交到 git。
-- health 只返回 provider、model、base_url 域名或别名，不返回 key。
+- HTML 生成不再依赖远程 API key。
+- 内容模型 key 不能进入浏览器响应。
+- 内容模型 key 不能进入事件。
+- 内容模型 key 不能进入 memory.md。
+- 内容模型 key 不能提交到 git。
 
 当前实现问题：
 
-- Ark API 已经在后端接入，但配置藏在启动环境变量里。
-- 前端不知道当前 HTML API 是否可替换。
+- HTML 最后一步已切为本地美学 Markdown 引擎。
+- 前端需要继续增强范式选择和预览状态。
 - 生成 HTML 直接走 lock_artifact，没有 preview。
-- 更换 API 需要重启进程，用户体验不成立。
-- 没有“测试连接”动作。
+- 不再需要远程 HTML API。
+- 已有“测试输出”动作，后续需要增加视觉检查结果。
 
-下一步开发必须把 HTML API 替换链前置到 HTML 工作台。
+下一步开发必须把 HTML 美学范式选择和视觉检查链前置到 HTML 工作台。
 
 ### 4.13 动作 M：生成 HTML 预览
 
@@ -971,4 +968,3 @@ Tab：
 - 生成 HTML 前能否预览？
 
 如果不能回答，就是链条没建好。
-

@@ -95,15 +95,15 @@
         </section>
 
         <section class="block hidden" id="html-section">
-          <div class="block-head"><span><small>HTML OUTPUT</small><h2>HTML 预览与 API</h2></span><em id="html-provider-summary">未读取</em></div>
+          <div class="block-head"><span><small>HTML OUTPUT</small><h2>HTML 预览与生成引擎</h2></span><em id="html-provider-summary">未读取</em></div>
           <form class="html-console" id="html-provider-form">
-            <label><span>Provider</span><select id="html-provider-kind"><option value="ark">火山方舟 / OpenAI-compatible</option><option value="local-template">本地模板</option></select></label>
-            <label><span>Base URL</span><input id="html-base-url" placeholder="https://ark.cn-beijing.volces.com/api/v3"></label>
-            <label><span>Model</span><input id="html-model" placeholder="doubao-seed-1-6"></label>
-            <label><span>API Key</span><input id="html-api-key" type="password" placeholder="只保存在当前服务进程"></label>
+            <label><span>Provider</span><select id="html-provider-kind"><option value="aesthetic-markdown">美学 Markdown 引擎</option><option value="local-template">本地旧模板</option></select></label>
+            <label><span>Base URL</span><input id="html-base-url" placeholder="本地引擎不需要 Base URL" disabled></label>
+            <label><span>Paradigm</span><select id="html-model"><option value="swiss">Swiss Modern</option><option value="editorial">Editorial Classic</option><option value="dark">Dark Tech</option><option value="brutal">Neo Brutalist</option></select></label>
+            <label><span>API Key</span><input id="html-api-key" type="password" placeholder="本地引擎不需要 API Key" disabled></label>
             <div class="html-actions">
-              <button class="button" id="save-html-provider" type="submit">保存 API</button>
-              <button class="button" id="test-html-provider" type="button">测试连接</button>
+              <button class="button" id="save-html-provider" type="submit">保存引擎</button>
+              <button class="button" id="test-html-provider" type="button">测试输出</button>
               <button class="button primary" id="lock-html-preview" type="button" disabled>锁定当前预览</button>
             </div>
           </form>

@@ -159,10 +159,11 @@ async function lockHtmlPreview(){
   }catch(error){toast(error.message,true)}finally{busy(button,false);updateActionButtons()}
 }
 function renderHtmlProvider(summary){
-  $("#html-provider-summary").textContent=summary.provider==="ark"?`Ark · ${summary.model}`:"本地模板";
-  $("#html-provider-kind").value=summary.provider==="ark"?"ark":"local-template";
+  const aesthetic=summary.provider==="aesthetic-markdown";
+  $("#html-provider-summary").textContent=aesthetic?`美学引擎 · ${summary.model||"swiss"}`:"本地旧模板";
+  $("#html-provider-kind").value=aesthetic?"aesthetic-markdown":"local-template";
   $("#html-base-url").value=summary.base_url||"";
-  $("#html-model").value=summary.model||"";
+  $("#html-model").value=summary.model||"swiss";
   $("#html-api-key").value="";
 }
 async function loadHtmlProvider(){
@@ -174,17 +175,14 @@ async function saveHtmlProvider(event){
   try{
     const summary=await api.post("/api/html-provider",{
       provider:$("#html-provider-kind").value,
-      base_url:$("#html-base-url").value,
-      model:$("#html-model").value,
-      api_key:$("#html-api-key").value,
-      require_remote:$("#html-provider-kind").value==="ark"
+      model:$("#html-model").value
     });
-    renderHtmlProvider(summary);toast("HTML API 已保存，密钥未写入项目记忆。");
+    renderHtmlProvider(summary);toast("HTML 生成引擎已保存。");
   }catch(error){toast(error.message,true)}finally{busy(button,false)}
 }
 async function testHtmlProvider(){
   const button=$("#test-html-provider");busy(button,true,"测试中…");
-  try{const result=await api.post("/api/html-provider/test",{});toast(`HTML API 可用：${result.provider}`)}
+  try{const result=await api.post("/api/html-provider/test",{});toast(`HTML 输出可用：${result.provider}`)}
   catch(error){toast(error.message,true)}finally{busy(button,false)}
 }
 function openGeneratedHtml(html,title){

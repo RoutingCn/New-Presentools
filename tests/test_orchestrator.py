@@ -13,7 +13,7 @@ class FakeHtmlProvider:
 
     def render(self, state, nodes):
         self.calls.append((state, tuple(nodes)))
-        return "<!doctype html><html><body><main>ark html</main></body></html>"
+        return "<!doctype html><html><body><main>custom html</main></body></html>"
 
 
 class DuplicateProvider:
@@ -186,12 +186,13 @@ class ControllerTest(unittest.TestCase):
         artifact = self.controller.lock_artifact(self.project.id, "html")
 
         self.assertIn("<!doctype html>", artifact.html)
-        self.assertIn("<article", artifact.html)
+        self.assertIn("<section", artifact.html)
+        self.assertIn('data-paradigm="swiss"', artifact.html)
 
     def test_lock_artifact_uses_injected_html_provider(self):
         html_provider = FakeHtmlProvider()
         controller = Controller(
-            EventStore(Path(self.temp.name) / "ark"),
+            EventStore(Path(self.temp.name) / "custom-html"),
             DeterministicProvider(),
             html_provider,
         )
@@ -201,7 +202,7 @@ class ControllerTest(unittest.TestCase):
 
         artifact = controller.lock_artifact(project.id, "html")
 
-        self.assertIn("ark html", artifact.html)
+        self.assertIn("custom html", artifact.html)
         self.assertEqual(len(html_provider.calls), 1)
         self.assertTrue(all(node.kind != "script" for node in html_provider.calls[0][1]))
 
