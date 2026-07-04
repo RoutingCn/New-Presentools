@@ -1,0 +1,252 @@
+import json
+import io
+import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError, URLError
+
+from app.agents import AgentDelivery
+from app.deepseek import DeepSeekProvider, UrllibTransport, SCRIPT_OUTPUT_CONTRACT
+from app.provider_config import ProviderConfig
+
+
+def valid_content(role="content"):
+    return json.dumps({
+        "agent": role,
+        "summary": "形成针对当前主题的核心判断。",
+        "outputs": [{"kind": "claim", "title": "判断", "body": "正文"}],
+        "affected_ids": [],
+        "uncertainties": ["需要数据验证"],
+        "quality_checks": ["论点明确"],
+        "next_action": "验证证据",
+    }, ensure_ascii=False)
+
+
+def valid_script():
+    return json.dumps({
+        "agent": "script",
+        "summary": "围绕主题形成完整讲述稿。",
+        "outputs": [
+            {"kind": "script_intro", "title": "开场", "body": "今天我们来讨论一个重要的话题。"},
+            {"kind": "script_definition", "title": "定义", "body": "先厘清核心概念。"},
+            {"kind": "script_body", "title": "论证", "body": "三个关键判断逐一展开。"},
+            {"kind": "script_example", "title": "例子", "body": "以真实场景说明。"},
+            {"kind": "script_transition", "title": "总结", "body": "回到主题，给出行动建议。"},
+        ],
+        "affected_ids": [],
+        "uncertainties": ["语气强度待定"],
+        "quality_checks": ["结构完整", "语言适合口语"],
+        "next_action": "待内容结构确定后进一步定制",
+    }, ensure_ascii=False)
+
+
+class FakeTransport:
+    def __init__(self, content=None):
+        self.response = {"choices": [{"message": {"content": content or valid_content()}}]}
+        self.calls = []
+
+    def __call__(self, url, headers, payload, timeout):
+        self.calls.append((url, headers, payload, timeout))
+        return self.response
+
+
+class SequenceTransport:
+    def __init__(self, contents):
+        self.contents = list(contents)
+        self.calls = []
+
+    def __call__(self, url, headers, payload, timeout):
+        self.calls.append((url, headers, payload, timeout))
+        return {"choices": [{"message": {"content": self.contents.pop(0)}}]}
+
+
+class DeepSeekProviderTest(unittest.TestCase):
+    def test_returns_valid_agent_delivery(self):
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+        transport = FakeTransport()
+
+        delivery = DeepSeekProvider(config, transport).run(
+            "content",
+            {"title": "制造业增长", "audience": "企业决策者"},
+            {"events": []},
+        )
+
+        self.assertIsInstance(delivery, AgentDelivery)
+        self.assertEqual(delivery.agent, "content")
+        url, headers, payload, timeout = transport.calls[0]
+        self.assertEqual(url, "https://api.deepseek.com/chat/completions")
+        self.assertEqual(headers["Authorization"], "Bearer test-key")
+        self.assertEqual(payload["model"], "deepseek-v4-flash")
+        self.assertEqual(payload["response_format"], {"type": "json_object"})
+        self.assertIn("制造业增长", payload["messages"][1]["content"])
+        self.assertEqual(timeout, 12)
+
+    def test_prompt_requires_professional_structure_and_language(self):
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+        transport = FakeTransport()
+
+        DeepSeekProvider(config, transport).run(
+            "content",
+            {"title": "HTML 演示", "audience": "创业者"},
+            {"events": []},
+        )
+
+        system = transport.calls[0][2]["messages"][0]["content"]
+        self.assertIn("顶级标准", system)
+        self.assertIn("概念", system)
+        self.assertIn("关系", system)
+        self.assertIn("例子", system)
+        self.assertIn("逻辑自洽", system)
+        self.assertIn("语言通顺优美", system)
+        self.assertIn("不得重复", system)
+
+    def test_script_role_uses_different_output_contract(self):
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+        transport = FakeTransport(valid_script())
+
+        delivery = DeepSeekProvider(config, transport).run(
+            "script",
+            {"title": "演示主题", "audience": "听众", "node_count": 5},
+            {"events": []},
+        )
+
+        self.assertEqual(delivery.agent, "script")
+        self.assertEqual(len(delivery.outputs), 5)
+        self.assertEqual(delivery.outputs[0]["kind"], "script_intro")
+        system = transport.calls[0][2]["messages"][0]["content"]
+        self.assertIn("演讲", system)
+
+    def provider(self, content):
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+        return DeepSeekProvider(config, FakeTransport(content))
+
+    def test_rejects_empty_content(self):
+        transport = FakeTransport("placeholder")
+        transport.response = {"choices": [{"message": {"content": ""}}]}
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+        with self.assertRaisesRegex(ValueError, "empty content"):
+            DeepSeekProvider(config, transport).run("content", {}, {})
+
+    def test_rejects_malformed_json(self):
+        with self.assertRaisesRegex(ValueError, "invalid JSON"):
+            self.provider("not-json").run("content", {}, {})
+
+    def test_rejects_missing_fields(self):
+        with self.assertRaisesRegex(ValueError, "missing fields"):
+            self.provider(json.dumps({"agent": "content", "summary": "short"})).run(
+                "content", {}, {}
+            )
+
+    def test_rejects_empty_outputs(self):
+        value = json.loads(valid_content())
+        value["outputs"] = []
+        with self.assertRaisesRegex(ValueError, "non-empty outputs"):
+            self.provider(json.dumps(value)).run("content", {}, {})
+
+    def test_retries_once_when_delivery_has_empty_outputs(self):
+        invalid = json.loads(valid_content())
+        invalid["outputs"] = []
+        transport = SequenceTransport([json.dumps(invalid), valid_content()])
+        config = ProviderConfig(
+            "test-key", "deepseek-v4-flash", "https://api.deepseek.com", 12
+        )
+
+        delivery = DeepSeekProvider(config, transport).run("content", {}, {})
+
+        self.assertEqual(delivery.agent, "content")
+        self.assertEqual(len(transport.calls), 2)
+        self.assertIn("non-empty outputs", transport.calls[1][2]["messages"][-1]["content"])
+
+    def test_rejects_role_mismatch(self):
+        with self.assertRaisesRegex(ValueError, "role mismatch"):
+            self.provider(valid_content("research")).run("content", {}, {})
+
+    def test_requires_key(self):
+        config = ProviderConfig("", "deepseek-v4-flash", "https://api.deepseek.com", 60)
+        with self.assertRaisesRegex(ValueError, "DEEPSEEK_API_KEY"):
+            DeepSeekProvider(config)
+
+
+class UrllibTransportTest(unittest.TestCase):
+    def test_authentication_error_does_not_expose_response_or_key(self):
+        error = HTTPError(
+            "https://example.test", 401, "Unauthorized", {},
+            io.BytesIO(b"raw-secret-response"),
+        )
+        with patch("app.deepseek.urlopen", side_effect=error):
+            with self.assertRaises(ValueError) as raised:
+                UrllibTransport()(
+                    "https://example.test",
+                    {"Authorization": "Bearer test-key"}, {}, 10,
+                )
+        message = str(raised.exception)
+        self.assertIn("authentication", message)
+        self.assertNotIn("test-key", message)
+        self.assertNotIn("raw-secret-response", message)
+
+    def test_rate_limit_is_normalized(self):
+        error = HTTPError("https://example.test", 429, "limited", {}, None)
+        with patch("app.deepseek.urlopen", side_effect=error):
+            with self.assertRaisesRegex(ValueError, "rate limit"):
+                UrllibTransport()("https://example.test", {}, {}, 10)
+
+    def test_network_error_is_normalized(self):
+        with patch("app.deepseek.urlopen", side_effect=URLError("offline")):
+            with self.assertRaisesRegex(ValueError, "network unavailable"):
+                UrllibTransport()("https://example.test", {}, {}, 10)
+
+    def test_timeout_is_normalized(self):
+        with patch("app.deepseek.urlopen", side_effect=TimeoutError()):
+            with self.assertRaisesRegex(ValueError, "timed out"):
+                UrllibTransport()("https://example.test", {}, {}, 10)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class UrllibTransportTest(unittest.TestCase):
+    def test_authentication_error_does_not_expose_response_or_key(self):
+        error = HTTPError(
+            "https://example.test", 401, "Unauthorized", {},
+            io.BytesIO(b"raw-secret-response"),
+        )
+        with patch("app.deepseek.urlopen", side_effect=error):
+            with self.assertRaises(ValueError) as raised:
+                UrllibTransport()(
+                    "https://example.test",
+                    {"Authorization": "Bearer test-key"}, {}, 10,
+                )
+        message = str(raised.exception)
+        self.assertIn("authentication", message)
+        self.assertNotIn("test-key", message)
+        self.assertNotIn("raw-secret-response", message)
+
+    def test_rate_limit_is_normalized(self):
+        error = HTTPError("https://example.test", 429, "limited", {}, None)
+        with patch("app.deepseek.urlopen", side_effect=error):
+            with self.assertRaisesRegex(ValueError, "rate limit"):
+                UrllibTransport()("https://example.test", {}, {}, 10)
+
+    def test_network_error_is_normalized(self):
+        with patch("app.deepseek.urlopen", side_effect=URLError("offline")):
+            with self.assertRaisesRegex(ValueError, "network unavailable"):
+                UrllibTransport()("https://example.test", {}, {}, 10)
+
+    def test_timeout_is_normalized(self):
+        with patch("app.deepseek.urlopen", side_effect=TimeoutError()):
+            with self.assertRaisesRegex(ValueError, "timed out"):
+                UrllibTransport()("https://example.test", {}, {}, 10)
+
+
+if __name__ == "__main__":
+    unittest.main()
